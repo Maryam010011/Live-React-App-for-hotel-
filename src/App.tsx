@@ -4,18 +4,11 @@ import Footer from './components/Footer';
 import Home from './pages/Home';
 import HotelList from './pages/HotelList';
 import HotelDetail from './pages/HotelDetail';
+import Booking from './pages/Booking';
 import './App.css';
 
 /**
  * Main App Component
- * 
- * This is the root component that sets up:
- * 1. React Router for navigation between pages
- * 2. Layout structure with Header and Footer
- * 3. Route definitions for all pages
- * 
- * The component uses BrowserRouter to enable client-side routing,
- * allowing navigation without page reloads.
  */
 function App() {
   return (
@@ -32,9 +25,11 @@ function App() {
             {/* Hotel list page - shows search results */}
             <Route path="/hotels" element={<HotelList />} />
             
-            {/* Hotel detail page - shows individual hotel details
-                :id is a URL parameter that will be extracted in the component */}
+            {/* Hotel detail page */}
             <Route path="/hotel/:id" element={<HotelDetail />} />
+
+            {/* Booking form page */}
+            <Route path="/book/:id" element={<Booking />} />
           </Routes>
         </main>
         

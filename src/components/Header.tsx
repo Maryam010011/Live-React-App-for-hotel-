@@ -25,7 +25,14 @@ function Header() {
     <header className="header">
       <div className="container header-content">
         <Link to="/" className="logo">
-          <span className="logo-icon">🏨</span>
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}>
+            <path d="M18 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            <line x1="8" y1="6" x2="8.01" y2="6"></line>
+            <line x1="16" y1="6" x2="16.01" y2="6"></line>
+            <line x1="12" y1="6" x2="12.01" y2="6"></line>
+            <line x1="12" y1="9" x2="12.01" y2="9"></line>
+          </svg>
           <span className="logo-text">LuxeStay</span>
         </Link>
         
@@ -41,6 +48,12 @@ function Header() {
             className={`nav-link ${location.pathname === '/hotels' ? 'active' : ''}`}
           >
             Browse Hotels
+          </Link>
+          <Link 
+            to="/book/1" 
+            className={`nav-link nav-book-btn ${location.pathname.startsWith('/book') ? 'active' : ''}`}
+          >
+            Book a Stay
           </Link>
         </nav>
       </div>

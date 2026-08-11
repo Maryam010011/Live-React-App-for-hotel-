@@ -178,26 +178,29 @@ function HotelDetail() {
               <div>
                 <h1 className="hotel-name">{hotel.name}</h1>
                 <p className="hotel-location">
-                  📍 {hotel.address}, {hotel.city}, {hotel.country}
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ display: 'inline-block', verticalAlign: 'text-bottom', marginRight: '6px' }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                  {hotel.address}, {hotel.city}, {hotel.country}
                 </p>
               </div>
               <div className="hotel-rating-large">
-                <span className="rating-icon-large">⭐</span>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" color="#f59e0b" style={{ marginRight: '4px' }}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                 <span className="rating-value-large">{hotel.rating}</span>
               </div>
             </div>
             
             <div className="hotel-description-section">
               <h2 className="section-title">About This Hotel</h2>
-              <p className="hotel-description-full">{hotel.description}</p>
+              {hotel.description.split('\n\n').map((paragraph, idx) => (
+                <p key={idx} className="hotel-description-full">{paragraph}</p>
+              ))}
             </div>
             
             <div className="hotel-amenities-section">
-              <h2 className="section-title">Amenities</h2>
+              <h2 className="section-title">Amenities & Features</h2>
               <div className="amenities-grid">
                 {hotel.amenities.map((amenity, index) => (
                   <div key={index} className="amenity-item">
-                    <span className="amenity-icon">✓</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#059669" strokeWidth="2.5" style={{ marginRight: '8px', flexShrink: 0 }}><polyline points="20 6 9 17 4 12"></polyline></svg>
                     {amenity}
                   </div>
                 ))}
@@ -206,11 +209,11 @@ function HotelDetail() {
             
             <div className="hotel-details-grid">
               <div className="detail-item">
-                <span className="detail-label">Total Rooms</span>
-                <span className="detail-value">{hotel.rooms}</span>
+                <span className="detail-label">Available Rooms</span>
+                <span className="detail-value">{hotel.rooms} Rooms</span>
               </div>
               <div className="detail-item">
-                <span className="detail-label">Hotel Type</span>
+                <span className="detail-label">Property Category</span>
                 <span className="detail-value">{hotel.type}</span>
               </div>
             </div>
@@ -223,7 +226,12 @@ function HotelDetail() {
                   <span className="price-amount">{hotel.price}</span>
                 </div>
               </div>
-              <button className="book-button">Book Now</button>
+              <button 
+                className="book-button"
+                onClick={() => navigate(`/book/${hotel.id}`)}
+              >
+                Book Reservation Now
+              </button>
             </div>
           </div>
         </div>
