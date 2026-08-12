@@ -7,14 +7,16 @@
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
   padding: 3rem 0;
   color: white;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md) #0f3d52;
+  transprancy: 50%;
 }
 
 .page-title {
   text-align: center;
   margin-bottom: 2rem;
   font-size: 2.5rem;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  color:whitesmoke;
+   text-shadow: 0 4px 12px #01141d;
 }
 
 .search-info {

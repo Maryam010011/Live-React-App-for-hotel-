@@ -51,6 +51,7 @@ function SearchBar({ onSearch }: SearchBarProps) {
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
         <input
+       
           type="text"
           className="search-input"
           placeholder="Search by city (e.g., New York, Miami)..."
