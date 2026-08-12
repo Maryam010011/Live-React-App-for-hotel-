@@ -16,7 +16,8 @@ import { cleanHtmlDescription } from '../utils/cleanHtml';
  * then falls back to mock data so the detail page always works.
  */
 
-const API_KEY  = ((import.meta as unknown as { env: Record<string, string> }).env?.VITE_LITEAPI_KEY || '') as string;
+const API_KEY = import.meta.env.VITE_LITEAPI_KEY || '';
+
 const API_BASE = 'https://api.liteapi.travel/v3.0';
 
 // ─── City → ISO-2 Country Code ──────────────────────────────────────────────
