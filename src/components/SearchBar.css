@@ -1,3 +1,51 @@
+.search-input-wrapper {
+  position: relative;
+}
+
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  overflow: hidden;
+}
+
+.suggestion-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 12px 16px;
+
+  border: none;
+  background: white;
+
+  cursor: pointer;
+  text-align: left;
+
+  font-size: 14px;
+  color: #333;
+}
+
+.suggestion-item:hover {
+  background: #f5f7fa;
+}
+
+.suggestion-item svg {
+  flex-shrink: 0;
+  color: #666;
+}
+
+
+
 .search-bar {
   display: flex;
   gap: 1rem;

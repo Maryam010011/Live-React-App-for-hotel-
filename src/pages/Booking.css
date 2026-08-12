@@ -4,7 +4,7 @@
 }
 
 .booking-header {
-  margin-bottom: 2rem;
+  margin-bottom: 4rem;
 }
 
 .back-btn {
@@ -17,7 +17,8 @@
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
+  margin-top: 3rem;
   transition: transform 0.2s ease;
 }
 
