@@ -5,129 +5,234 @@ import { HotelModel } from './models/Hotel.js';
 
 dotenv.config();
 
+// Ensure DNS SRV lookup uses public DNS
 try {
   dns.setServers(['8.8.8.8', '1.1.1.1']);
 } catch (e) {}
 
-// The EXACT hotel dataset currently used in the frontend
-const INITIAL_HOTELS = [
-  {
-    id: 1,
-    name: 'Grand Luxury Hotel',
-    city: 'New York',
-    country: 'USA',
-    address: '123 Park Avenue, Manhattan',
-    price: 250,
-    rating: 4.7,
-    description:
-      'Experience luxury in the heart of Manhattan. Our hotel offers world-class amenities, stunning city views, and exceptional service. Perfect for business travelers and tourists alike.',
-    image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
-    amenities: ['WiFi', 'Pool', 'Gym', 'Restaurant', 'Bar', 'Spa', 'Room Service'],
-    rooms: 150,
-    type: 'Luxury',
-  },
-  {
-    id: 2,
-    name: 'Seaside Resort & Spa',
-    city: 'Miami',
-    country: 'USA',
-    address: '456 Ocean Drive, South Beach',
-    price: 180,
-    rating: 4.5,
-    description:
-      'Relax by the ocean at our beautiful beachfront resort. Enjoy pristine beaches, world-class spa treatments, and exquisite dining experiences with ocean views.',
-    image: 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80',
-    amenities: ['WiFi', 'Beach Access', 'Pool', 'Spa', 'Restaurant', 'Water Sports'],
-    rooms: 200,
-    type: 'Resort',
-  },
-  {
-    id: 3,
-    name: 'Downtown Business Hotel',
-    city: 'Chicago',
-    country: 'USA',
-    address: '789 Michigan Avenue',
-    price: 150,
-    rating: 4.3,
-    description:
-      'Ideal for business travelers, located in the financial district with easy access to major corporate offices and convention centers. Modern rooms with work-friendly amenities.',
-    image: 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80',
-    amenities: ['WiFi', 'Business Center', 'Gym', 'Conference Rooms', 'Restaurant'],
-    rooms: 120,
-    type: 'Business',
-  },
-  {
-    id: 4,
-    name: 'Mountain View Lodge',
-    city: 'Denver',
-    country: 'USA',
-    address: '321 Mountain Road',
-    price: 120,
-    rating: 4.6,
-    description:
-      'Escape to nature with breathtaking mountain views. Perfect for outdoor enthusiasts with easy access to hiking trails, skiing, and adventure activities.',
-    image: 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80',
-    amenities: ['WiFi', 'Fireplace', 'Mountain Views', 'Hiking Access', 'Restaurant'],
-    rooms: 80,
-    type: 'Lodge',
-  },
-  {
-    id: 5,
-    name: 'Historic Boutique Inn',
-    city: 'Boston',
-    country: 'USA',
-    address: '555 Beacon Street',
-    price: 200,
-    rating: 4.8,
-    description:
-      'Stay in a beautifully restored historic building with modern comforts. Each room is uniquely designed, blending classic elegance with contemporary amenities.',
-    image: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80',
-    amenities: ['WiFi', 'Historic Building', 'Restaurant', 'Bar', 'Concierge'],
-    rooms: 45,
-    type: 'Boutique',
-  },
-  {
-    id: 6,
-    name: 'Coastal Paradise Hotel',
-    city: 'San Diego',
-    country: 'USA',
-    address: '888 Pacific Coast Highway',
-    price: 190,
-    rating: 4.6,
-    description:
-      'Discover paradise on the California coast. Our hotel features stunning ocean views, direct beach access, and exceptional dining with fresh local seafood.',
-    image: 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80',
-    amenities: ['WiFi', 'Beach Access', 'Pool', 'Restaurant', 'Gym', 'Surfboard Rental'],
-    rooms: 180,
-    type: 'Resort',
-  },
+const LITEAPI_KEY = process.env.VITE_LITEAPI_KEY || 'sand_3a7fba9d-0928-4cc4-a8c0-c3322344b63e';
+const LITEAPI_BASE = 'https://api.liteapi.travel/v3.0';
+
+// Strip HTML tags and decode HTML entities from descriptions
+function cleanHtmlDescription(html) {
+  if (!html) return '';
+
+  let text = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ');
+
+  text = text.replace(/<[^>]+>/g, '');
+
+  const entities = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™',
+  };
+
+  text = text.replace(/&[a-z0-9#]+;/gi, (match) => {
+    const lower = match.toLowerCase();
+    if (entities[lower]) return entities[lower];
+    if (lower.startsWith('&#x')) {
+      const code = parseInt(lower.slice(3, -1), 16);
+      return !isNaN(code) ? String.fromCharCode(code) : match;
+    }
+    if (lower.startsWith('&#')) {
+      const code = parseInt(lower.slice(2, -1), 10);
+      return !isNaN(code) ? String.fromCharCode(code) : match;
+    }
+    return match;
+  });
+
+  const paragraphs = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  return paragraphs.join('\n\n');
+}
+
+// Map raw LiteAPI object to Hotel schema
+function mapLiteApiToHotel(raw, index, targetCity) {
+  const getRating = () => {
+    if (raw.reviewScore) return parseFloat(raw.reviewScore.toFixed(1));
+    const stars = raw.stars || raw.starRating || 4;
+    return parseFloat(Math.min(5.0, 3.0 + stars * 0.4).toFixed(1));
+  };
+
+  const getPrice = () => {
+    if (raw.startingFrom && raw.startingFrom.amount) {
+      return Math.round(raw.startingFrom.amount);
+    }
+    const stars = raw.stars || raw.starRating || 4;
+    return 100 + stars * 40 + (index % 5) * 15;
+  };
+
+  const getType = () => {
+    const stars = raw.stars || raw.starRating || 4;
+    if (stars >= 5) return 'Luxury';
+    if (stars === 4) return 'Deluxe';
+    if (stars === 3) return 'Business';
+    return 'Hotel';
+  };
+
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
+    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80',
+    'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80',
+    'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80',
+    'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80',
+  ];
+
+  const image = raw.main_photo || raw.thumbnail || fallbackImages[index % fallbackImages.length];
+
+  return {
+    id: index + 1,
+    name: raw.name || 'Boutique Hotel',
+    city: targetCity.city,
+    country: targetCity.countryCode,
+    address: raw.address || (raw.address && raw.address.line1) || `${targetCity.city} City Center`,
+    price: getPrice(),
+    rating: getRating(),
+    description: cleanHtmlDescription(
+      raw.hotelDescription ||
+        raw.description ||
+        `Experience comfort and world-class service at ${raw.name || 'this hotel'} in ${targetCity.city}.`
+    ),
+    image: image,
+    amenities: ['WiFi', 'Pool', 'Gym', 'Restaurant', 'Bar', 'Room Service'],
+    rooms: raw.rooms || 120,
+    type: getType(),
+  };
+}
+
+// Extended list of 34 global destinations across 18 countries
+const TARGET_CITIES = [
+  // USA
+  { city: 'New York', countryCode: 'US' },
+  { city: 'Los Angeles', countryCode: 'US' },
+  { city: 'Chicago', countryCode: 'US' },
+  { city: 'Miami', countryCode: 'US' },
+  { city: 'San Francisco', countryCode: 'US' },
+  { city: 'Las Vegas', countryCode: 'US' },
+  { city: 'Boston', countryCode: 'US' },
+  { city: 'Seattle', countryCode: 'US' },
+  { city: 'Denver', countryCode: 'US' },
+  { city: 'Orlando', countryCode: 'US' },
+  // Pakistan
+  { city: 'Lahore', countryCode: 'PK' },
+  { city: 'Karachi', countryCode: 'PK' },
+  { city: 'Islamabad', countryCode: 'PK' },
+  // Middle East
+  { city: 'Dubai', countryCode: 'AE' },
+  { city: 'Abu Dhabi', countryCode: 'AE' },
+  { city: 'Riyadh', countryCode: 'SA' },
+  // Europe
+  { city: 'London', countryCode: 'GB' },
+  { city: 'Paris', countryCode: 'FR' },
+  { city: 'Rome', countryCode: 'IT' },
+  { city: 'Barcelona', countryCode: 'ES' },
+  { city: 'Amsterdam', countryCode: 'NL' },
+  { city: 'Berlin', countryCode: 'DE' },
+  { city: 'Madrid', countryCode: 'ES' },
+  { city: 'Prague', countryCode: 'CZ' },
+  { city: 'Vienna', countryCode: 'AT' },
+  // Asia & Australia
+  { city: 'Tokyo', countryCode: 'JP' },
+  { city: 'Singapore', countryCode: 'SG' },
+  { city: 'Bangkok', countryCode: 'TH' },
+  { city: 'Sydney', countryCode: 'AU' },
+  { city: 'Istanbul', countryCode: 'TR' },
+  { city: 'Seoul', countryCode: 'KR' },
+  { city: 'Kuala Lumpur', countryCode: 'MY' },
+  // Canada
+  { city: 'Toronto', countryCode: 'CA' },
+  { city: 'Vancouver', countryCode: 'CA' },
 ];
 
-const seedDatabase = async () => {
+async function seedDatabase() {
   const mongoUri = process.env.MONGODB_URI;
 
   if (!mongoUri) {
-    console.error('❌ MONGODB_URI is missing in environment variables. Please check your .env file.');
+    console.error('❌ MONGODB_URI is missing in environment variables.');
     process.exit(1);
   }
 
   try {
-    console.log('Connecting to MongoDB...');
+    console.log('Connecting to MongoDB Atlas...');
     await mongoose.connect(mongoUri);
-    console.log('✅ Connected to MongoDB');
+    console.log('✅ Connected to MongoDB Atlas');
 
-    console.log('Clearing existing hotel records...');
+    console.log(`Starting expanded LiteAPI migration across ${TARGET_CITIES.length} global cities...`);
+    const allFetchedHotels = [];
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const item of TARGET_CITIES) {
+      try {
+        const url = `${LITEAPI_BASE}/data/hotels?countryCode=${item.countryCode}&cityName=${encodeURIComponent(
+          item.city
+        )}&limit=50`;
+
+        const res = await fetch(url, {
+          headers: {
+            'X-API-Key': LITEAPI_KEY,
+            Accept: 'application/json',
+          },
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const rawList = json.data || [];
+          console.log(`📡 [${item.countryCode}] ${item.city}: Received ${rawList.length} hotels`);
+          rawList.forEach((raw) => {
+            allFetchedHotels.push({ raw, cityInfo: item });
+          });
+          successCount++;
+        } else {
+          console.warn(`⚠️ [${item.countryCode}] ${item.city}: LiteAPI returned status ${res.status}`);
+          failCount++;
+        }
+      } catch (err) {
+        console.warn(`⚠️ [${item.countryCode}] ${item.city}: Fetch error - ${err.message}`);
+        failCount++;
+      }
+
+      // 200ms rate limit delay buffer between requests
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+
+    console.log(`\nTransforming ${allFetchedHotels.length} raw LiteAPI hotel records...`);
+    const hotelsToSeed = allFetchedHotels.map((item, idx) =>
+      mapLiteApiToHotel(item.raw, idx, item.cityInfo)
+    );
+
+    console.log('Clearing existing hotel collection in MongoDB Atlas...');
     await HotelModel.deleteMany({});
 
-    console.log('Seeding current frontend hotels into MongoDB...');
-    const inserted = await HotelModel.insertMany(INITIAL_HOTELS);
+    console.log(`Bulk inserting ${hotelsToSeed.length} LiteAPI hotels into MongoDB Atlas...`);
+    const inserted = await HotelModel.insertMany(hotelsToSeed);
 
-    console.log(`🎉 Successfully seeded ${inserted.length} hotels into MongoDB!`);
+    console.log(`\n============================================================`);
+    console.log(`🎉 MIGRATION COMPLETE!`);
+    console.log(`Total hotels inserted: ${inserted.length}`);
+    console.log(`Total cities successfully queried: ${successCount} / ${TARGET_CITIES.length}`);
+    console.log(`Failed city requests: ${failCount}`);
+    console.log(`============================================================\n`);
+
     process.exit(0);
   } catch (error) {
     console.error('❌ Error seeding database:', error);
     process.exit(1);
   }
-};
+}
 
 seedDatabase();
