@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import HotelList from './pages/HotelList';
 import HotelDetail from './pages/HotelDetail';
 import Booking from './pages/Booking';
+import AdminHotelList from './pages/admin/AdminHotelList';
+import HotelForm from './pages/admin/HotelForm';
 import './App.css';
 
 /**
@@ -30,6 +32,11 @@ function App() {
 
             {/* Booking form page */}
             <Route path="/book/:id" element={<Booking />} />
+
+            {/* Admin CRUD routes */}
+            <Route path="/admin/hotels" element={<AdminHotelList />} />
+            <Route path="/admin/hotels/new" element={<HotelForm />} />
+            <Route path="/admin/hotels/:id/edit" element={<HotelForm />} />
           </Routes>
         </main>
         

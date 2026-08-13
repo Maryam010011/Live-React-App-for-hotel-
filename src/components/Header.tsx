@@ -50,6 +50,12 @@ function Header() {
             Browse Hotels
           </Link>
           <Link 
+            to="/admin/hotels" 
+            className={`nav-link ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
+          >
+            Admin
+          </Link>
+          <Link 
             to="/book/1" 
             className={`nav-link nav-book-btn ${location.pathname.startsWith('/book') ? 'active' : ''}`}
           >

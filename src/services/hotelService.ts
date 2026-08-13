@@ -1,211 +1,15 @@
 import { Hotel } from '../types/hotel';
-import { cleanHtmlDescription } from '../utils/cleanHtml';
 
 /**
- * Hotel Service - LiteAPI Integration
+ * Hotel Service - Custom REST API Integration
  *
- * This service fetches REAL hotel data from LiteAPI (liteapi.travel).
- * API key is stored securely in the .env file (VITE_LITEAPI_KEY).
- *
- * Flow:
- * 1. fetchHotels(city) → calls LiteAPI GET /data/hotels?countryCode=XX&cityName=YY
- * 2. Maps the LiteAPI response shape → our Hotel interface
- * 3. Falls back to MOCK_HOTELS if the API is unavailable
- *
- * fetchHotelById(id) → looks up in a session cache populated by fetchHotels,
- * then falls back to mock data so the detail page always works.
+ * Interacts with the Node.js/Express/MongoDB backend server.
+ * Uses VITE_API_URL environment variable as base URL.
  */
 
-const API_KEY = import.meta.env.VITE_LITEAPI_KEY || '';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-const API_BASE = 'https://api.liteapi.travel/v3.0';
-
-// ─── City → ISO-2 Country Code ──────────────────────────────────────────────
-// Extended map so users can search popular cities worldwide
-const CITY_COUNTRY_MAP: Record<string, string> = {
-  // USA
-  'new york':      'US',
-  'los angeles':   'US',
-  'chicago':       'US',
-  'miami':         'US',
-  'boston':        'US',
-  'seattle':       'US',
-  'denver':        'US',
-  'san diego':     'US',
-  'san francisco': 'US',
-  'las vegas':     'US',
-  'houston':       'US',
-  'dallas':        'US',
-  'orlando':       'US',
-  'washington':    'US',
-  // Europe
-  'london':        'GB',
-  'manchester':    'GB',
-  'paris':         'FR',
-  'rome':          'IT',
-  'milan':         'IT',
-  'barcelona':     'ES',
-  'madrid':        'ES',
-  'amsterdam':     'NL',
-  'berlin':        'DE',
-  'munich':        'DE',
-  'vienna':        'AT',
-  'prague':        'CZ',
-  'budapest':      'HU',
-  'lisbon':        'PT',
-  'athens':        'GR',
-  'istanbul':      'TR',
-  // Middle East
-  'dubai':         'AE',
-  'abu dhabi':     'AE',
-  'doha':          'QA',
-  'riyadh':        'SA',
-  // Asia
-  'tokyo':         'JP',
-  'osaka':         'JP',
-  'seoul':         'KR',
-  'beijing':       'CN',
-  'shanghai':      'CN',
-  'hong kong':     'HK',
-  'singapore':     'SG',
-  'bangkok':       'TH',
-  'bali':          'ID',
-  'jakarta':       'ID',
-  'mumbai':        'IN',
-  'delhi':         'IN',
-  'new delhi':     'IN',
-  'kolkata':       'IN',
-  // Pakistan
-  'karachi':       'PK',
-  'lahore':        'PK',
-  'islamabad':     'PK',
-  'peshawar':      'PK',
-  'rawalpindi':    'PK',
-  // Australia
-  'sydney':        'AU',
-  'melbourne':     'AU',
-  'brisbane':      'AU',
-  // Americas
-  'toronto':       'CA',
-  'vancouver':     'CA',
-  'mexico city':   'MX',
-  'cancun':        'MX',
-  'cairo':         'EG',
-  'nairobi':       'KE',
-  'johannesburg':  'ZA',
-  'cape town':     'ZA',
-};
-
-/**
- * Returns the ISO-2 country code for a city name.
- * Falls back to 'US' for unknown cities.
- */
-const getCountryCode = (city: string): string => {
-  const key = city.toLowerCase().trim();
-  // Direct match
-  if (CITY_COUNTRY_MAP[key]) return CITY_COUNTRY_MAP[key];
-  // Partial match (e.g. "New York City" → "new york")
-  for (const [cityKey, code] of Object.entries(CITY_COUNTRY_MAP)) {
-    if (key.includes(cityKey) || cityKey.includes(key)) return code;
-  }
-  return 'US';
-};
-
-// ─── Fallback image pool ─────────────────────────────────────────────────────
-const FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
-  'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80',
-  'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80',
-  'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80',
-  'https://images.unsplash.com/photo-1564501049412-61c2a3083791?w=800&q=80',
-  'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80',
-  'https://images.unsplash.com/photo-1596436889106-be35e843f974?w=800&q=80',
-  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80',
-];
-
-// ─── Session cache (populated by fetchHotels, used by fetchHotelById) ────────
-let hotelCache: Hotel[] = [];
-
-/**
- * Maps a raw LiteAPI hotel object to our Hotel interface.
- *
- * LiteAPI response shape (abbreviated):
- * {
- *   hotelId:          "lp3803c",
- *   name:             "Grand Hyatt",
- *   hotelDescription: "...",
- *   address:          { city, country, line1, countryCode },
- *   starRating:       5,
- *   main_photo:       "https://...",
- *   facilities:       [ { name: "WiFi" }, ... ],
- *   rooms:            300,
- *   categoryId:       "luxury",
- * }
- */
-const mapToHotel = (raw: any, index: number): Hotel => {
-  // Build amenities list from facilities array
-  const amenities: string[] = Array.isArray(raw.facilities)
-    ? raw.facilities.slice(0, 8).map((f: any) =>
-        typeof f === 'string' ? f : f.name || f.facilityName || 'Amenity'
-      )
-    : ['WiFi', 'Air Conditioning', 'Room Service'];
-
-  // Determine hotel type from starRating or category
-  const getType = (raw: any): string => {
-    if (raw.categoryId) return raw.categoryId;
-    const stars = raw.starRating || 0;
-    if (stars >= 5) return 'Luxury';
-    if (stars === 4) return 'Deluxe';
-    if (stars === 3) return 'Business';
-    return 'Hotel';
-  };
-
-  // Generate a realistic price from star rating
-  const getPrice = (raw: any): number => {
-    if (raw.startingFrom?.amount) return Math.round(raw.startingFrom.amount);
-    const stars = raw.starRating || 3;
-    const base = stars * 50;
-    // Add some variance per hotel
-    return base + (index % 5) * 20;
-  };
-
-  // Build rating from starRating (convert 1–5 stars to a 1-decimal score)
-  const getRating = (raw: any): number => {
-    if (raw.reviewScore) return parseFloat(raw.reviewScore.toFixed(1));
-    const stars = raw.starRating || 3;
-    // Map 1-5 stars → 3.0 – 5.0 with variance
-    const base = 2.5 + stars * 0.4;
-    const variance = (index % 3) * 0.1;
-    return parseFloat(Math.min(5.0, base + variance).toFixed(1));
-  };
-
-  const image =
-    raw.main_photo ||
-    raw.thumbnail ||
-    FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
-
-  return {
-    id: index + 1,
-    name: raw.name || 'Hotel',
-    city: raw.address?.city || raw.city || '',
-    country: raw.address?.country || raw.address?.countryCode || '',
-    address: raw.address?.line1 || raw.address?.full || raw.address?.street || '',
-    price: getPrice(raw),
-    rating: getRating(raw),
-    description: cleanHtmlDescription(
-      raw.hotelDescription ||
-      raw.description ||
-      `A ${raw.starRating || 3}-star hotel located in ${raw.address?.city || 'the city'}, offering comfortable rooms and excellent amenities for both leisure and business travelers.`
-    ),
-    image,
-    amenities: amenities.length > 0 ? amenities : ['WiFi', 'Restaurant', 'Gym'],
-    rooms: raw.rooms || raw.numberOfRooms || 50,
-    type: getType(raw),
-  };
-};
-
-// ─── Mock fallback data ───────────────────────────────────────────────────────
-// Used only when the API is unavailable (network error, rate limit, etc.)
+// Fallback dataset used if the backend server is temporarily unreachable
 const MOCK_HOTELS: Hotel[] = [
   {
     id: 1,
@@ -299,99 +103,116 @@ const MOCK_HOTELS: Hotel[] = [
   },
 ];
 
-// ─── Public API functions ─────────────────────────────────────────────────────
-
 /**
- * Fetches hotels from LiteAPI for a given city.
- * Falls back to MOCK_HOTELS on any error.
- *
- * @param city - The city to search (e.g. "London", "Dubai")
- * @returns Promise<Hotel[]>
+ * Fetches all hotels or filters by city via backend REST API
  */
 export const fetchHotels = async (city?: string): Promise<Hotel[]> => {
   try {
-    const searchCity = city?.trim() || 'New York';
-    const countryCode = getCountryCode(searchCity);
+    const endpoint = city && city.trim() !== ''
+      ? `${API_BASE_URL}/api/hotels?city=${encodeURIComponent(city.trim())}`
+      : `${API_BASE_URL}/api/hotels`;
 
-    const url = new URL(`${API_BASE}/data/hotels`);
-    url.searchParams.set('countryCode', countryCode);
-    url.searchParams.set('cityName', searchCity);
-    url.searchParams.set('limit', '20');
-
-    console.log(`[LiteAPI] Fetching hotels for "${searchCity}" (${countryCode})…`);
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'X-API-Key': API_KEY,
-        'Accept':    'application/json',
-      },
-    });
+    const response = await fetch(endpoint);
 
     if (!response.ok) {
-      throw new Error(`LiteAPI responded with status ${response.status}`);
+      throw new Error(`API responded with status ${response.status}`);
     }
 
     const json = await response.json();
-    const rawHotels: any[] = json.data ?? json.hotels ?? [];
-
-    if (!rawHotels.length) {
-      console.warn('[LiteAPI] No hotels returned, using fallback data');
-      // If user searched and got nothing, return empty (not mock)
-      if (city && city.trim() !== '') return [];
-      return MOCK_HOTELS;
-    }
-
-    const hotels = rawHotels.map(mapToHotel);
-    hotelCache = hotels; // save to cache for fetchHotelById
-    console.log(`[LiteAPI] ✅ Received ${hotels.length} hotels`);
-    return hotels;
-
+    return json.data || json;
   } catch (error) {
-    console.error('[LiteAPI] Fetch failed, using fallback data:', error);
-
-    // Return filtered mock data so a search still "works" in fallback mode
+    console.warn('[hotelService] Backend API fetch failed, using fallback data:', error);
     if (city && city.trim() !== '') {
-      const filtered = MOCK_HOTELS.filter(h =>
+      return MOCK_HOTELS.filter((h) =>
         h.city.toLowerCase().includes(city.toLowerCase())
       );
-      return filtered;
     }
     return MOCK_HOTELS;
   }
 };
 
 /**
- * Fetches a single hotel by its numeric ID.
- *
- * Priority order:
- * 1. Session cache (populated by the most recent fetchHotels call)
- * 2. Mock fallback data
- *
- * @param id - Numeric hotel ID (from hotel.id in the list)
- * @returns Promise<Hotel | null>
+ * Fetches a single hotel by ID via backend REST API
  */
-export const fetchHotelById = async (id: number): Promise<Hotel | null> => {
+export const fetchHotelById = async (id: number | string): Promise<Hotel | null> => {
   try {
-    // 1. Check session cache first (fastest, from current search)
-    if (hotelCache.length > 0) {
-      const cached = hotelCache.find(h => h.id === id);
-      if (cached) return cached;
+    const response = await fetch(`${API_BASE_URL}/api/hotels/${id}`);
+
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`API responded with status ${response.status}`);
     }
 
-    // 2. Fall back to mock data
-    const mock = MOCK_HOTELS.find(h => h.id === id);
-    return mock ?? null;
-
+    const json = await response.json();
+    return json.data || json;
   } catch (error) {
-    console.error('[LiteAPI] fetchHotelById error:', error);
-    return null;
+    console.warn(`[hotelService] Backend API fetchById(${id}) failed, checking fallback:`, error);
+    const mockMatch = MOCK_HOTELS.find((h) => String(h.id) === String(id));
+    return mockMatch || null;
   }
 };
 
 /**
- * Searches hotels with optional price/rating filters.
- * Delegates to fetchHotels then applies client-side filtering.
+ * Creates a new hotel via POST /api/hotels
+ */
+export const createHotel = async (hotelData: Partial<Hotel>): Promise<Hotel> => {
+  const response = await fetch(`${API_BASE_URL}/api/hotels`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(hotelData),
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    throw new Error(errJson.message || 'Failed to create hotel');
+  }
+
+  const json = await response.json();
+  return json.data;
+};
+
+/**
+ * Updates an existing hotel via PUT /api/hotels/:id
+ */
+export const updateHotel = async (
+  id: number | string,
+  hotelData: Partial<Hotel>
+): Promise<Hotel> => {
+  const response = await fetch(`${API_BASE_URL}/api/hotels/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(hotelData),
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    throw new Error(errJson.message || 'Failed to update hotel');
+  }
+
+  const json = await response.json();
+  return json.data;
+};
+
+/**
+ * Deletes a hotel via DELETE /api/hotels/:id
+ */
+export const deleteHotel = async (id: number | string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/hotels/${id}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    throw new Error(errJson.message || 'Failed to delete hotel');
+  }
+};
+
+/**
+ * Searches hotels with filters
  */
 export const searchHotels = async (
   city: string,
@@ -402,13 +223,13 @@ export const searchHotels = async (
   let results = await fetchHotels(city);
 
   if (minPrice !== undefined) {
-    results = results.filter(h => h.price >= minPrice);
+    results = results.filter((h) => h.price >= minPrice);
   }
   if (maxPrice !== undefined) {
-    results = results.filter(h => h.price <= maxPrice);
+    results = results.filter((h) => h.price <= maxPrice);
   }
   if (minRating !== undefined) {
-    results = results.filter(h => h.rating >= minRating);
+    results = results.filter((h) => h.rating >= minRating);
   }
 
   return results;
