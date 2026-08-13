@@ -4,6 +4,7 @@ import { Hotel } from '../../types/hotel';
 import { fetchHotelById, createHotel, updateHotel } from '../../services/hotelService';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ErrorMessage from '../../components/ErrorMessage';
+import ImageUploader from '../../components/ImageUploader';
 import './HotelForm.css';
 
 function HotelForm() {
@@ -229,20 +230,12 @@ function HotelForm() {
           <h2>Media & Description</h2>
           <div className="form-grid">
             <div className="input-field full-width">
-              <label>Main Image URL *</label>
-              <input
-                type="url"
-                required
-                placeholder="https://images.unsplash.com/..."
+              <label>Hotel Main Image *</label>
+              <ImageUploader
                 value={formData.image || ''}
-                onChange={(e) => handleInputChange('image', e.target.value)}
+                onImageUploaded={(url) => handleInputChange('image', url)}
+                required
               />
-              {formData.image && (
-                <div className="image-preview">
-                  <img src={formData.image} alt="Preview" />
-                  <span>Image Preview</span>
-                </div>
-              )}
             </div>
 
             <div className="input-field full-width">
