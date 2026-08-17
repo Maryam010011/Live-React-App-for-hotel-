@@ -28,17 +28,21 @@ export const connectDB = async () => {
     throw new Error(errorMsg);
   }
 
-  // DNS SRV fallback for Windows environments
-  try {
-    dns.setServers(['8.8.8.8', '1.1.1.1']);
-  } catch (e) {
-    // Ignore in serverless/production where system resolver handles DNS
+  // DNS SRV fallback ONLY for local Windows environments (not in Vercel serverless)
+  if (!process.env.VERCEL) {
+    try {
+      dns.setServers(['8.8.8.8', '1.1.1.1']);
+    } catch (e) {
+      // Ignore if system resolver handles DNS
+    }
   }
 
   try {
     cachedConnectionPromise = mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 8000,
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
       socketTimeoutMS: 45000,
+      maxPoolSize: 10,
     });
 
     const conn = await cachedConnectionPromise;
@@ -55,3 +59,4 @@ export const connectDB = async () => {
     throw error;
   }
 };
+

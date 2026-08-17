@@ -1,4 +1,20 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+/**
+ * Resolves the API Base URL cleanly for both local development and Vercel production environments.
+ */
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    if (!isLocal && envUrl && envUrl.includes('localhost')) {
+      return '';
+    }
+  }
+  if (!envUrl) return '';
+  return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface BookingPayload {
   id?: string;
@@ -25,8 +41,9 @@ export interface BookingPayload {
  * Creates a new reservation in MongoDB via POST /api/bookings
  */
 export const createBooking = async (bookingData: Partial<BookingPayload>): Promise<BookingPayload> => {
+  const endpoint = `${API_BASE_URL}/api/bookings`;
   try {
-    const response = await fetch(`${API_BASE_URL}/api/bookings`, {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,19 +53,22 @@ export const createBooking = async (bookingData: Partial<BookingPayload>): Promi
 
     if (!response.ok) {
       const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Failed to submit booking');
+      const message = errJson.message || `API responded with status ${response.status}`;
+      console.error(`❌ [bookingService] createBooking error (${response.status}):`, message);
+      throw new Error(message);
     }
 
     const json = await response.json();
     return json.data;
   } catch (error) {
-    console.warn('[bookingService] Failed to post booking to API, returning local object fallback:', error);
+    console.warn('⚠️ [bookingService] Failed to post booking to API. Check backend connectivity & MONGODB_URI/RESEND_API_KEY environment variables:', error);
     return {
       ...(bookingData as BookingPayload),
       bookingRef: bookingData.bookingRef || 'LX-' + Math.floor(100000 + Math.random() * 900000),
     };
   }
 };
+
 
 /**
  * Fetches all bookings via GET /api/bookings

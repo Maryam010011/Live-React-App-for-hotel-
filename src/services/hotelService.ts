@@ -7,7 +7,25 @@ import { Hotel } from '../types/hotel';
  * Uses VITE_API_URL environment variable as base URL.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+/**
+ * Resolves the API Base URL cleanly for both local development and Vercel production environments.
+ * If VITE_API_URL points to localhost but the app is accessed on a non-localhost domain (e.g. Vercel production),
+ * automatically fallback to relative path `/api` so client requests hit the production Vercel deployment.
+ */
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    if (!isLocal && envUrl && envUrl.includes('localhost')) {
+      return '';
+    }
+  }
+  if (!envUrl) return '';
+  return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Fallback dataset used if the backend server is temporarily unreachable
 const MOCK_HOTELS: Hotel[] = [
@@ -107,21 +125,25 @@ const MOCK_HOTELS: Hotel[] = [
  * Fetches all hotels or filters by city via backend REST API
  */
 export const fetchHotels = async (city?: string): Promise<Hotel[]> => {
-  try {
-    const endpoint = city && city.trim() !== ''
-      ? `${API_BASE_URL}/api/hotels?city=${encodeURIComponent(city.trim())}`
-      : `${API_BASE_URL}/api/hotels`;
+  const endpoint = city && city.trim() !== ''
+    ? `${API_BASE_URL}/api/hotels?city=${encodeURIComponent(city.trim())}`
+    : `${API_BASE_URL}/api/hotels`;
 
+  try {
     const response = await fetch(endpoint);
 
     if (!response.ok) {
-      throw new Error(`API responded with status ${response.status}`);
+      const errorBody = await response.json().catch(() => ({}));
+      const message = errorBody.message || `API responded with HTTP status ${response.status}`;
+      console.error(`❌ [hotelService] API error (${response.status}) on endpoint ${endpoint}:`, message);
+      throw new Error(message);
     }
 
     const json = await response.json();
     return json.data || json;
   } catch (error) {
-    console.warn('[hotelService] Backend API fetch failed, using fallback data:', error);
+    console.warn(`⚠️ [hotelService] Backend API fetch failed on ${endpoint}:`, error);
+    console.warn('⚠️ [hotelService] Utilizing fallback dataset (6 mock hotels). Check backend database connectivity & MONGODB_URI scoping.');
     if (city && city.trim() !== '') {
       return MOCK_HOTELS.filter((h) =>
         h.city.toLowerCase().includes(city.toLowerCase())
@@ -135,22 +157,27 @@ export const fetchHotels = async (city?: string): Promise<Hotel[]> => {
  * Fetches a single hotel by ID via backend REST API
  */
 export const fetchHotelById = async (id: number | string): Promise<Hotel | null> => {
+  const endpoint = `${API_BASE_URL}/api/hotels/${id}`;
   try {
-    const response = await fetch(`${API_BASE_URL}/api/hotels/${id}`);
+    const response = await fetch(endpoint);
 
     if (!response.ok) {
       if (response.status === 404) return null;
-      throw new Error(`API responded with status ${response.status}`);
+      const errorBody = await response.json().catch(() => ({}));
+      const message = errorBody.message || `API responded with HTTP status ${response.status}`;
+      console.error(`❌ [hotelService] API error (${response.status}) on endpoint ${endpoint}:`, message);
+      throw new Error(message);
     }
 
     const json = await response.json();
     return json.data || json;
   } catch (error) {
-    console.warn(`[hotelService] Backend API fetchById(${id}) failed, checking fallback:`, error);
+    console.warn(`⚠️ [hotelService] Backend API fetchById(${id}) failed:`, error);
     const mockMatch = MOCK_HOTELS.find((h) => String(h.id) === String(id));
     return mockMatch || null;
   }
 };
+
 
 /**
  * Creates a new hotel via POST /api/hotels
