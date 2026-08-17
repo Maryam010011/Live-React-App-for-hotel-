@@ -27,6 +27,12 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+/** Reads the JWT from localStorage and returns an Authorization header object */
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('luxestay_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 // Fallback dataset used if the backend server is temporarily unreachable
 const MOCK_HOTELS: Hotel[] = [
   {
@@ -187,6 +193,7 @@ export const createHotel = async (hotelData: Partial<Hotel>): Promise<Hotel> => 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(hotelData),
   });
@@ -211,6 +218,7 @@ export const updateHotel = async (
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(hotelData),
   });
@@ -230,6 +238,9 @@ export const updateHotel = async (
 export const deleteHotel = async (id: number | string): Promise<void> => {
   const response = await fetch(`${API_BASE_URL}/api/hotels/${id}`, {
     method: 'DELETE',
+    headers: {
+      ...getAuthHeaders(),
+    },
   });
 
   if (!response.ok) {

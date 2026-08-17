@@ -1,48 +1,66 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import HotelList from './pages/HotelList';
 import HotelDetail from './pages/HotelDetail';
 import Booking from './pages/Booking';
+import Login from './pages/Login';
+import Register from './pages/Register';
 import AdminHotelList from './pages/admin/AdminHotelList';
 import HotelForm from './pages/admin/HotelForm';
 import './App.css';
 
-/**
- * Main App Component
- */
 function App() {
   return (
     <Router>
-      <div className="app">
-        {/* Header is outside Routes so it appears on all pages */}
-        <Header />
-        
-        <main className="main-content">
-          <Routes>
-            {/* Home page - the landing/search page */}
-            <Route path="/" element={<Home />} />
-            
-            {/* Hotel list page - shows search results */}
-            <Route path="/hotels" element={<HotelList />} />
-            
-            {/* Hotel detail page */}
-            <Route path="/hotel/:id" element={<HotelDetail />} />
+      <AuthProvider>
+        <div className="app">
+          <Header />
 
-            {/* Booking form page */}
-            <Route path="/book/:id" element={<Booking />} />
+          <main className="main-content">
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Home />} />
+              <Route path="/hotels" element={<HotelList />} />
+              <Route path="/hotel/:id" element={<HotelDetail />} />
+              <Route path="/book/:id" element={<Booking />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
 
-            {/* Admin CRUD routes */}
-            <Route path="/admin/hotels" element={<AdminHotelList />} />
-            <Route path="/admin/hotels/new" element={<HotelForm />} />
-            <Route path="/admin/hotels/:id/edit" element={<HotelForm />} />
-          </Routes>
-        </main>
-        
-        {/* Footer is outside Routes so it appears on all pages */}
-        <Footer />
-      </div>
+              {/* Admin-only routes — ProtectedRoute redirects non-admins */}
+              <Route
+                path="/admin/hotels"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <AdminHotelList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/hotels/new"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <HotelForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/hotels/:id/edit"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <HotelForm />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </main>
+
+          <Footer />
+        </div>
+      </AuthProvider>
     </Router>
   );
 }

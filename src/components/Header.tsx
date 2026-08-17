@@ -1,26 +1,32 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Header.css';
 
-/**
- * Header Component
- * 
- * This component renders the navigation bar at the top of every page.
- * 
- * Key features:
- * 1. Uses useLocation hook to highlight the active page
- * 2. Provides navigation links using react-router's Link component
- * 3. Responsive design that adapts to mobile screens
- * 
- * Why useLocation is used:
- * - We need to know which page we're on to highlight the active nav link
- * - useLocation returns the current location object with pathname
- * - This triggers a re-render when the route changes
- */
 function Header() {
-  // Get current location to highlight active nav item
-  // This causes the component to re-render when the route changes
   const location = useLocation();
-  
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    setDropdownOpen(false);
+    navigate('/');
+  };
+
   return (
     <header className="header">
       <div className="container header-content">
@@ -35,32 +41,80 @@ function Header() {
           </svg>
           <span className="logo-text">LuxeStay</span>
         </Link>
-        
+
         <nav className="nav">
-          <Link 
-            to="/" 
-            className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
-          >
+          <Link to="/" className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}>
             Home
           </Link>
-          <Link 
-            to="/hotels" 
-            className={`nav-link ${location.pathname === '/hotels' ? 'active' : ''}`}
-          >
+          <Link to="/hotels" className={`nav-link ${location.pathname === '/hotels' ? 'active' : ''}`}>
             Browse Hotels
           </Link>
-          <Link 
-            to="/admin/hotels" 
-            className={`nav-link ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
-          >
-            Admin
-          </Link>
-          <Link 
-            to="/book/1" 
+
+          {/* Admin link — only visible to admins */}
+          {isAdmin && (
+            <Link
+              to="/admin/hotels"
+              className={`nav-link ${location.pathname.startsWith('/admin') ? 'active' : ''}`}
+            >
+              Admin
+            </Link>
+          )}
+
+          <Link
+            to="/book/1"
             className={`nav-link nav-book-btn ${location.pathname.startsWith('/book') ? 'active' : ''}`}
           >
             Book a Stay
           </Link>
+
+          {/* Auth section */}
+          {user ? (
+            <div className="nav-user-menu" ref={dropdownRef}>
+              <button
+                className="nav-user-pill"
+                onClick={() => setDropdownOpen((o) => !o)}
+                aria-expanded={dropdownOpen}
+                aria-haspopup="true"
+              >
+                <span className="nav-user-avatar">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="nav-user-name">{user.name.split(' ')[0]}</span>
+                {user.role === 'admin' && (
+                  <span className="nav-admin-badge">Admin</span>
+                )}
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {dropdownOpen && (
+                <div className="nav-dropdown">
+                  <div className="nav-dropdown-header">
+                    <span className="nav-dropdown-name">{user.name}</span>
+                    <span className="nav-dropdown-email">{user.email}</span>
+                    <span className={`nav-dropdown-role ${user.role}`}>{user.role}</span>
+                  </div>
+                  <div className="nav-dropdown-divider" />
+                  <button className="nav-dropdown-item nav-dropdown-logout" onClick={handleLogout}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className={`nav-link nav-login-btn ${location.pathname === '/login' ? 'active' : ''}`}
+            >
+              Sign In
+            </Link>
+          )}
         </nav>
       </div>
     </header>

@@ -560,7 +560,25 @@ There is NO persistent running server. Vercel spins up an isolated Node containe
 ### Q11: Explain your REST API status codes.
 **Answer:**  
 - `200 OK`: Successful retrieval or update (`GET`, `PUT`, `DELETE`).
-- `201 Created`: Document successfully created in MongoDB (`POST /api/hotels`, `POST /api/bookings`).
-- `400 Bad Request`: Client validation error (e.g. missing required fields).
-- `404 Not Found`: Requested hotel or booking ID does not exist.
+- `201 Created`: Document successfully created in MongoDB (`POST /api/hotels`, `POST /api/bookings`, `POST /api/auth/register`).
+- `400 Bad Request`: Client validation error (e.g. missing required fields, password too short).
+- `401 Unauthorized`: Missing, invalid, or expired JWT token.
+- `403 Forbidden`: Authenticated user lacks sufficient permissions (e.g., customer trying to access admin hotel CRUD).
+- `404 Not Found`: Requested hotel, booking, or user ID does not exist.
+- `409 Conflict`: Attempting to register with an email that already exists.
 - `500 / 503 Server Error`: Unhandled database or connection failure.
+
+---
+
+### Q12: How does authentication and Role-Based Access Control (RBAC) work in your app?
+**Answer:**  
+*"LuxeStay uses stateless JSON Web Token (JWT) authentication. When a user registers or logs in via `/api/auth/login`, their password is verified with `bcrypt.compare()`. The server signs and returns a 7-day JWT containing the user's ID, email, and role ('admin' or 'customer').*
+
+*For protected endpoints (e.g. creating/editing hotels or viewing all bookings), the client attaches this token in the `Authorization: Bearer <token>` HTTP header. Our backend `protect` middleware decodes and verifies the token, attaching `req.user`, and `requireAdmin` enforces that `req.user.role === 'admin'`, returning 403 Forbidden otherwise. On the frontend, React Router routes are guarded by `<ProtectedRoute requireAdmin>`."*
+
+---
+
+### Q13: Why did you use JWTs instead of session cookies?
+**Answer:**  
+*"Because our backend is deployed as Serverless Functions on Vercel. Serverless architectures are completely stateless — there is no persistent memory or shared session store between function invocations. JWTs are self-contained and digitally signed with `JWT_SECRET`, meaning any serverless instance can verify the user's identity and permissions instantly without needing a shared session database."*
+

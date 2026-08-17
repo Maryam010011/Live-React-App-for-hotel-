@@ -16,6 +16,12 @@ const getApiBaseUrl = (): string => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+/** Reads the JWT from localStorage and returns an Authorization header object */
+const getAuthHeaders = (): Record<string, string> => {
+  const token = localStorage.getItem('luxestay_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export interface BookingPayload {
   id?: string;
   bookingRef: string;
@@ -75,7 +81,9 @@ export const createBooking = async (bookingData: Partial<BookingPayload>): Promi
  */
 export const fetchBookings = async (): Promise<BookingPayload[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/bookings`);
+    const response = await fetch(`${API_BASE_URL}/api/bookings`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!response.ok) {
       throw new Error(`API responded with status ${response.status}`);
     }
@@ -98,6 +106,7 @@ export const updateBooking = async (
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(data),
   });
@@ -117,6 +126,7 @@ export const updateBooking = async (
 export const deleteBooking = async (id: string): Promise<void> => {
   const response = await fetch(`${API_BASE_URL}/api/bookings/${id}`, {
     method: 'DELETE',
+    headers: { ...getAuthHeaders() },
   });
 
   if (!response.ok) {
