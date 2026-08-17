@@ -9,6 +9,7 @@ import HotelDetail from './pages/HotelDetail';
 import Booking from './pages/Booking';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import MyBookings from './pages/MyBookings';
 import AdminHotelList from './pages/admin/AdminHotelList';
 import HotelForm from './pages/admin/HotelForm';
 import './App.css';
@@ -29,6 +30,16 @@ function App() {
               <Route path="/book/:id" element={<Booking />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+
+              {/* Protected Customer Routes */}
+              <Route
+                path="/my-bookings"
+                element={
+                  <ProtectedRoute>
+                    <MyBookings />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Admin-only routes — ProtectedRoute redirects non-admins */}
               <Route

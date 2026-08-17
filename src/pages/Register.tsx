@@ -1,10 +1,12 @@
 import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './Auth.css';
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTarget = searchParams.get('redirect') || '/';
   const { register } = useAuth();
 
   const [name, setName] = useState('');
@@ -23,7 +25,7 @@ export default function Register() {
     setLoading(true);
     try {
       await register(name, email, password);
-      navigate('/');
+      navigate(redirectTarget);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally {
@@ -44,6 +46,12 @@ export default function Register() {
           <h1 className="auth-title">Create Account</h1>
           <p className="auth-subtitle">Join LuxeStay and start exploring luxury hotels</p>
         </div>
+
+        {searchParams.get('redirect') && (
+          <div className="auth-info-banner">
+            Create an account to complete your reservation.
+          </div>
+        )}
 
         {error && <div className="auth-error">{error}</div>}
 
@@ -99,7 +107,9 @@ export default function Register() {
 
         <p className="auth-switch">
           Already have an account?{' '}
-          <Link to="/login">Sign in</Link>
+          <Link to={`/login${searchParams.get('redirect') ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''}`}>
+            Sign in
+          </Link>
         </p>
       </div>
     </div>

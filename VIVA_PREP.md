@@ -574,11 +574,19 @@ There is NO persistent running server. Vercel spins up an isolated Node containe
 **Answer:**  
 *"LuxeStay uses stateless JSON Web Token (JWT) authentication. When a user registers or logs in via `/api/auth/login`, their password is verified with `bcrypt.compare()`. The server signs and returns a 7-day JWT containing the user's ID, email, and role ('admin' or 'customer').*
 
-*For protected endpoints (e.g. creating/editing hotels or viewing all bookings), the client attaches this token in the `Authorization: Bearer <token>` HTTP header. Our backend `protect` middleware decodes and verifies the token, attaching `req.user`, and `requireAdmin` enforces that `req.user.role === 'admin'`, returning 403 Forbidden otherwise. On the frontend, React Router routes are guarded by `<ProtectedRoute requireAdmin>`."*
+*For protected endpoints (creating bookings, managing hotels, or viewing reservation lists), the client attaches this token in the `Authorization: Bearer <token>` HTTP header. Our backend `protect` middleware decodes and verifies the token, attaching `req.user`, and `requireAdmin` enforces that `req.user.role === 'admin'`, returning 403 Forbidden otherwise. On the frontend, React Router routes are guarded by `<ProtectedRoute>`."*
 
 ---
 
 ### Q13: Why did you use JWTs instead of session cookies?
 **Answer:**  
 *"Because our backend is deployed as Serverless Functions on Vercel. Serverless architectures are completely stateless — there is no persistent memory or shared session store between function invocations. JWTs are self-contained and digitally signed with `JWT_SECRET`, meaning any serverless instance can verify the user's identity and permissions instantly without needing a shared session database."*
+
+---
+
+### Q14: How does customer booking association and the "My Bookings" page work?
+**Answer:**  
+*"Only authenticated users (customers or admins) can create a booking (`POST /api/bookings`). When a booking is submitted, the `protect` middleware populates `req.user.id`, which is automatically assigned to the `user` reference field in the Mongoose `Booking` schema.*
+
+*The customer's "My Bookings" page (`/my-bookings`) calls `GET /api/bookings/my`, which queries MongoDB for `{ $or: [{ user: req.user.id }, { email: req.user.email }] }` to display their personal reservation history. Non-logged-in visitors attempting to book are prompted to sign in first, while admins retain access to all system bookings via `/api/bookings`."*
 

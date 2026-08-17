@@ -50,6 +50,16 @@ function Header() {
             Browse Hotels
           </Link>
 
+          {/* My Bookings link — visible when logged in */}
+          {user && (
+            <Link
+              to="/my-bookings"
+              className={`nav-link ${location.pathname === '/my-bookings' ? 'active' : ''}`}
+            >
+              My Bookings
+            </Link>
+          )}
+
           {/* Admin link — only visible to admins */}
           {isAdmin && (
             <Link
@@ -95,6 +105,22 @@ function Header() {
                     <span className="nav-dropdown-email">{user.email}</span>
                     <span className={`nav-dropdown-role ${user.role}`}>{user.role}</span>
                   </div>
+                  <div className="nav-dropdown-divider" />
+
+                  <Link
+                    to="/my-bookings"
+                    className="nav-dropdown-item"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    My Bookings
+                  </Link>
+
                   <div className="nav-dropdown-divider" />
                   <button className="nav-dropdown-item nav-dropdown-logout" onClick={handleLogout}>
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">

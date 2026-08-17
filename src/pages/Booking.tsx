@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { Hotel } from '../types/hotel';
 import { fetchHotelById } from '../services/hotelService';
 import { createBooking } from '../services/bookingService';
@@ -28,6 +29,7 @@ interface BookingFormData {
 function Booking() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
 
   const [hotel, setHotel] = useState<Hotel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,22 @@ function Booking() {
     cardCvc: '882',
     cardName: '',
   });
+
+  // Auto-fill logged-in user details into booking form
+  useEffect(() => {
+    if (user) {
+      const nameParts = user.name.split(' ');
+      const first = nameParts[0] || '';
+      const last = nameParts.slice(1).join(' ') || '';
+      setFormData((prev) => ({
+        ...prev,
+        firstName: prev.firstName || first,
+        lastName: prev.lastName || last,
+        email: prev.email || user.email,
+        cardName: prev.cardName || user.name,
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     const loadHotel = async () => {
@@ -120,7 +138,13 @@ function Booking() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      navigate(`/login?redirect=/book/${id}`);
+      return;
+    }
+
     setSubmitting(true);
+    setError(null);
 
     const generatedRef = 'LX-' + Math.floor(100000 + Math.random() * 900000);
 
@@ -148,18 +172,20 @@ function Booking() {
       setBookingRef(created.bookingRef || generatedRef);
       setIsConfirmed(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Booking submission error:', err);
-      // Still allow UI confirmation on fallback
-      setBookingRef(generatedRef);
-      setIsConfirmed(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const msg = err instanceof Error ? err.message : 'Could not create reservation.';
+      if (msg.includes('log in') || msg.includes('token') || msg.includes('Access denied')) {
+        navigate(`/login?redirect=/book/${id}`);
+      } else {
+        setError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="booking-page container">
         <LoadingSpinner />
@@ -167,19 +193,56 @@ function Booking() {
     );
   }
 
-  if (error || !hotel) {
+  // If visitor is not logged in, show clear Sign In prompt before booking
+  if (!user) {
+    return (
+      <div className="booking-page container">
+        <button className="back-btn" onClick={() => navigate('/hotels')}>
+          &larr; Back to Hotels
+        </button>
+        <div className="auth-required-box" style={{
+          textAlign: 'center',
+          background: 'white',
+          borderRadius: '16px',
+          padding: '3.5rem 2rem',
+          border: '1px solid #e2e8f0',
+          maxWidth: '520px',
+          margin: '2rem auto',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.06)'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔐</div>
+          <h2 style={{ fontSize: '1.6rem', color: '#0f172a', marginBottom: '0.6rem', fontWeight: 800 }}>
+            Sign In Required to Book
+          </h2>
+          <p style={{ color: '#64748b', marginBottom: '2rem', fontSize: '0.95rem', lineHeight: 1.6 }}>
+            Please sign in to your LuxeStay account to complete your hotel reservation and view your bookings anytime.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <Link to={`/login?redirect=/book/${id}`} className="btn-primary" style={{ padding: '0.75rem 1.5rem', fontWeight: 700 }}>
+              Sign In to Continue
+            </Link>
+            <Link to={`/register?redirect=/book/${id}`} className="btn-secondary" style={{ padding: '0.75rem 1.5rem', fontWeight: 600 }}>
+              Create Account
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !hotel) {
     return (
       <div className="booking-page container">
         <button className="back-btn" onClick={() => navigate('/hotels')}>
           &larr; Back to Search Results
         </button>
-        <ErrorMessage message={error || 'Hotel not found'} onRetry={() => window.location.reload()} />
+        <ErrorMessage message={error} onRetry={() => window.location.reload()} />
       </div>
     );
   }
 
   // Render Confirmation Receipt View
-  if (isConfirmed) {
+  if (isConfirmed && hotel) {
     return (
       <div className="booking-page container">
         <div className="confirmation-card">
@@ -242,13 +305,12 @@ function Booking() {
           </div>
 
           <div className="confirmation-actions">
+            <Link to="/my-bookings" className="btn-primary">
+              View My Bookings
+            </Link>
             <button className="btn-secondary" onClick={() => window.print()}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
               Print Receipt
             </button>
-            <Link to="/" className="btn-primary">
-              Return to Home
-            </Link>
             <Link to="/hotels" className="btn-outline">
               Explore More Hotels
             </Link>
@@ -257,6 +319,8 @@ function Booking() {
       </div>
     );
   }
+
+  if (!hotel) return null;
 
   return (
     <div className="booking-page container">
@@ -268,6 +332,12 @@ function Booking() {
         <h1 className="page-heading">Complete Your Reservation</h1>
         <p className="page-subheading">Instant confirmation &bull; No hidden reservation fees &bull; Secure 256-bit SSL encryption</p>
       </div>
+
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '1rem', borderRadius: '10px', marginBottom: '1.5rem' }}>
+          {error}
+        </div>
+      )}
 
       <div className="booking-layout">
         {/* Main Form Left Column */}
@@ -308,7 +378,7 @@ function Booking() {
                 <input
                   type="email"
                   required
-                  placeholder="john.doe@example.com"
+                  placeholder="john@example.com"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                 />
@@ -318,7 +388,7 @@ function Booking() {
                 <input
                   type="tel"
                   required
-                  placeholder="+1 (555) 019-2834"
+                  placeholder="+1 (555) 000-0000"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                 />
@@ -326,18 +396,18 @@ function Booking() {
             </div>
           </div>
 
-          {/* Step 2: Stay Dates & Room Type */}
+          {/* Step 2: Stay & Room Configuration */}
           <div className="form-card">
             <div className="form-card-header">
               <div className="step-badge">2</div>
               <div>
-                <h2>Dates & Room Selection</h2>
-                <p>Customize your stay preferences</p>
+                <h2>Stay Details & Options</h2>
+                <p>Select your stay dates and preferred room tier</p>
               </div>
             </div>
             <div className="form-grid">
               <div className="input-group">
-                <label>Check-in Date *</label>
+                <label>Check-In Date *</label>
                 <input
                   type="date"
                   required
@@ -346,7 +416,7 @@ function Booking() {
                 />
               </div>
               <div className="input-group">
-                <label>Check-out Date *</label>
+                <label>Check-Out Date *</label>
                 <input
                   type="date"
                   required
@@ -355,10 +425,10 @@ function Booking() {
                 />
               </div>
               <div className="input-group">
-                <label>Adults</label>
+                <label>Adult Guests</label>
                 <select
                   value={formData.adults}
-                  onChange={(e) => handleInputChange('adults', parseInt(e.target.value))}
+                  onChange={(e) => handleInputChange('adults', parseInt(e.target.value, 10))}
                 >
                   <option value={1}>1 Adult</option>
                   <option value={2}>2 Adults</option>
@@ -370,7 +440,7 @@ function Booking() {
                 <label>Children</label>
                 <select
                   value={formData.children}
-                  onChange={(e) => handleInputChange('children', parseInt(e.target.value))}
+                  onChange={(e) => handleInputChange('children', parseInt(e.target.value, 10))}
                 >
                   <option value={0}>No Children</option>
                   <option value={1}>1 Child</option>
@@ -379,55 +449,46 @@ function Booking() {
               </div>
             </div>
 
-            <div className="room-selector">
-              <label className="selector-label">Select Room Category</label>
+            <div className="room-selector-group">
+              <label className="section-label">Room Tier Selection</label>
               <div className="room-options-grid">
                 <div
                   className={`room-option-card ${formData.roomType === 'standard' ? 'selected' : ''}`}
                   onClick={() => handleInputChange('roomType', 'standard')}
                 >
-                  <div className="option-radio"></div>
-                  <div className="option-info">
-                    <h4>Standard King / Twin</h4>
-                    <p>Comfortable room with city views, Wi-Fi, and king bed</p>
-                  </div>
-                  <div className="option-price">${hotel.price}<small>/night</small></div>
+                  <div className="room-title">Standard Room</div>
+                  <div className="room-desc">Comfortable queen bed with city view</div>
+                  <div className="room-price">${hotel.price} / night</div>
                 </div>
 
                 <div
                   className={`room-option-card ${formData.roomType === 'deluxe' ? 'selected' : ''}`}
                   onClick={() => handleInputChange('roomType', 'deluxe')}
                 >
-                  <div className="option-radio"></div>
-                  <div className="option-info">
-                    <h4>Deluxe Ocean View</h4>
-                    <p>Spacious suite with balcony, ocean panorama & breakfast</p>
-                  </div>
-                  <div className="option-price">${Math.round(hotel.price * 1.25)}<small>/night</small></div>
+                  <div className="room-title">Deluxe Room</div>
+                  <div className="room-desc">King bed, private balcony & premium bath</div>
+                  <div className="room-price">${Math.round(hotel.price * 1.25)} / night</div>
                 </div>
 
                 <div
                   className={`room-option-card ${formData.roomType === 'suite' ? 'selected' : ''}`}
                   onClick={() => handleInputChange('roomType', 'suite')}
                 >
-                  <div className="option-radio"></div>
-                  <div className="option-info">
-                    <h4>Executive Penthouse Suite</h4>
-                    <p>Luxury high-floor suite, VIP lounge access & spa tub</p>
-                  </div>
-                  <div className="option-price">${Math.round(hotel.price * 1.6)}<small>/night</small></div>
+                  <div className="room-title">Executive Suite</div>
+                  <div className="room-desc">Separate living lounge & ocean view</div>
+                  <div className="room-price">${Math.round(hotel.price * 1.6)} / night</div>
                 </div>
               </div>
             </div>
 
-            <div className="input-group full-width">
+            <div className="input-group full-width" style={{ marginTop: '1rem' }}>
               <label>Special Requests (Optional)</label>
               <textarea
                 rows={3}
-                placeholder="High floor, late check-in, quiet room, quiet bed arrangement..."
+                placeholder="High floor, quiet room, late check-in, dietary preferences..."
                 value={formData.specialRequests}
                 onChange={(e) => handleInputChange('specialRequests', e.target.value)}
-              />
+              ></textarea>
             </div>
           </div>
 
@@ -436,40 +497,39 @@ function Booking() {
             <div className="form-card-header">
               <div className="step-badge">3</div>
               <div>
-                <h2>Payment Details</h2>
+                <h2>Payment Information</h2>
                 <p>Choose your preferred payment method</p>
               </div>
             </div>
 
-            <div className="payment-tabs">
+            <div className="payment-methods-tabs">
               <button
                 type="button"
-                className={`payment-tab ${formData.paymentMethod === 'card' ? 'active' : ''}`}
+                className={`pay-tab ${formData.paymentMethod === 'card' ? 'active' : ''}`}
                 onClick={() => handleInputChange('paymentMethod', 'card')}
               >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
                 Credit / Debit Card
               </button>
               <button
                 type="button"
-                className={`payment-tab ${formData.paymentMethod === 'paypal' ? 'active' : ''}`}
+                className={`pay-tab ${formData.paymentMethod === 'paypal' ? 'active' : ''}`}
                 onClick={() => handleInputChange('paymentMethod', 'paypal')}
               >
                 PayPal Express
               </button>
               <button
                 type="button"
-                className={`payment-tab ${formData.paymentMethod === 'hotel' ? 'active' : ''}`}
+                className={`pay-tab ${formData.paymentMethod === 'hotel' ? 'active' : ''}`}
                 onClick={() => handleInputChange('paymentMethod', 'hotel')}
               >
-                Pay at Check-in
+                Pay at Check-In
               </button>
             </div>
 
             {formData.paymentMethod === 'card' && (
-              <div className="form-grid">
+              <div className="form-grid" style={{ marginTop: '1.25rem' }}>
                 <div className="input-group full-width">
-                  <label>Cardholder Name *</label>
+                  <label>Cardholder Name</label>
                   <input
                     type="text"
                     required
@@ -479,17 +539,17 @@ function Booking() {
                   />
                 </div>
                 <div className="input-group full-width">
-                  <label>Card Number *</label>
+                  <label>Card Number</label>
                   <input
                     type="text"
                     required
-                    placeholder="4532 0000 0000 8892"
+                    placeholder="4532 •••• •••• 8892"
                     value={formData.cardNumber}
                     onChange={(e) => handleInputChange('cardNumber', e.target.value)}
                   />
                 </div>
                 <div className="input-group">
-                  <label>Expiry Date *</label>
+                  <label>Expiration Date</label>
                   <input
                     type="text"
                     required
@@ -499,11 +559,11 @@ function Booking() {
                   />
                 </div>
                 <div className="input-group">
-                  <label>CVC / CVV *</label>
+                  <label>CVC Security Code</label>
                   <input
                     type="password"
-                    maxLength={4}
                     required
+                    maxLength={4}
                     placeholder="123"
                     value={formData.cardCvc}
                     onChange={(e) => handleInputChange('cardCvc', e.target.value)}
@@ -513,89 +573,74 @@ function Booking() {
             )}
 
             {formData.paymentMethod === 'paypal' && (
-              <div className="payment-notice-box">
-                <p>You will be redirected to PayPal to complete your payment securely after clicking confirm.</p>
+              <div className="tab-info-box">
+                <p>You will be redirected to PayPal to complete your purchase securely after clicking "Confirm & Pay".</p>
               </div>
             )}
 
             {formData.paymentMethod === 'hotel' && (
-              <div className="payment-notice-box">
-                <p>No upfront charge! You will pay directly to the hotel reception upon check-in.</p>
+              <div className="tab-info-box">
+                <p>Your credit card is used to guarantee your room reservation. No charge will be processed until check-in.</p>
               </div>
             )}
-
-            <button type="submit" className="submit-booking-btn" disabled={submitting}>
-              {submitting ? (
-                <span>Processing Reservation...</span>
-              ) : (
-                <>
-                  <span>Confirm & Complete Booking (${totalPrice})</span>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </>
-              )}
-            </button>
           </div>
+
+          <button
+            type="submit"
+            className="submit-booking-btn"
+            disabled={submitting}
+          >
+            {submitting ? 'Processing Reservation...' : `Confirm & Pay $${totalPrice}`}
+          </button>
         </form>
 
-        {/* Sidebar Summary Right Column */}
+        {/* Price Breakdown Sidebar */}
         <aside className="booking-summary-sidebar">
           <div className="summary-card">
-            <div className="summary-hotel-header">
-              <img src={hotel.image} alt={hotel.name} className="summary-thumb" />
+            <h3>Reservation Summary</h3>
+
+            <div className="summary-hotel-info">
+              <img src={hotel.image} alt={hotel.name} className="summary-hotel-img" />
               <div>
-                <span className="summary-badge">{hotel.type}</span>
-                <h3 className="summary-title">{hotel.name}</h3>
-                <p className="summary-location">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                  {hotel.city}, {hotel.country}
-                </p>
-                <div className="summary-rating">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" color="#eab308"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                  <strong>{hotel.rating}</strong> / 5.0 Rating
-                </div>
+                <h4 className="summary-hotel-name">{hotel.name}</h4>
+                <p className="summary-hotel-location">📍 {hotel.city}, {hotel.country}</p>
+                <div className="summary-rating">★ {hotel.rating} / 5.0 Rating</div>
               </div>
             </div>
 
             <div className="summary-divider"></div>
 
-            <div className="summary-dates">
-              <div className="date-block">
-                <span className="label">Check-In</span>
-                <strong>{formData.checkIn}</strong>
-                <small>From 14:00</small>
-              </div>
-              <div className="date-arrow">&rarr;</div>
-              <div className="date-block">
-                <span className="label">Check-Out</span>
-                <strong>{formData.checkOut}</strong>
-                <small>Until 11:00</small>
-              </div>
+            <div className="summary-row">
+              <span>Nights Stay</span>
+              <span>{nights} {nights === 1 ? 'Night' : 'Nights'}</span>
+            </div>
+            <div className="summary-row">
+              <span>Room Tier</span>
+              <span style={{ textTransform: 'capitalize' }}>{formData.roomType}</span>
+            </div>
+            <div className="summary-row">
+              <span>Rate / Night</span>
+              <span>${basePricePerNight}</span>
+            </div>
+            <div className="summary-row">
+              <span>Room Subtotal</span>
+              <span>${subtotal}</span>
+            </div>
+            <div className="summary-row">
+              <span>Taxes & Service Fees (12%)</span>
+              <span>${taxesAndFees}</span>
             </div>
 
             <div className="summary-divider"></div>
 
-            <div className="summary-breakdown">
-              <h4>Price Breakdown</h4>
-              <div className="breakdown-row">
-                <span>${basePricePerNight} x {nights} {nights === 1 ? 'night' : 'nights'}</span>
-                <span>${subtotal}</span>
-              </div>
-              <div className="breakdown-row">
-                <span>Taxes & Service Fees (12%)</span>
-                <span>${taxesAndFees}</span>
-              </div>
-              <div className="breakdown-row total-row">
-                <span>Total Due</span>
-                <span className="total-price">${totalPrice} USD</span>
-              </div>
+            <div className="summary-total-row">
+              <span>Total Price</span>
+              <span>${totalPrice} USD</span>
             </div>
 
-            <div className="guarantee-box">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-              <div>
-                <strong>Free Cancellation</strong>
-                <p>Cancel up to 24 hours prior to check-in for a full refund.</p>
-              </div>
+            <div className="cancellation-policy-box">
+              <strong>Free Cancellation</strong>
+              <p>Cancel up to 24 hours before check-in for a 100% full refund.</p>
             </div>
           </div>
         </aside>

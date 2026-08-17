@@ -48,6 +48,30 @@ export const getBookingById = async (req, res) => {
   }
 };
 
+// GET /api/bookings/my
+export const getMyBookings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userEmail = req.user.email;
+    const bookings = await BookingModel.find({
+      $or: [{ user: userId }, { email: userEmail }],
+    }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      status: 'success',
+      results: bookings.length,
+      data: bookings,
+    });
+  } catch (error) {
+    console.error('Error in getMyBookings:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch your bookings',
+      error: error.message,
+    });
+  }
+};
+
 // POST /api/bookings
 export const createBooking = async (req, res) => {
   try {
@@ -79,6 +103,7 @@ export const createBooking = async (req, res) => {
     const ref = bookingRef || 'LX-' + Math.floor(100000 + Math.random() * 900000);
 
     const newBooking = await BookingModel.create({
+      user: req.user ? req.user.id : undefined,
       bookingRef: ref,
       hotelId: hotelId || 1,
       hotelName: hotelName || 'LuxeStay Hotel',

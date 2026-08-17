@@ -1,10 +1,12 @@
 import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './Auth.css';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTarget = searchParams.get('redirect') || '/';
   const { login } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -18,7 +20,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/');
+      navigate(redirectTarget);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
@@ -39,6 +41,12 @@ export default function Login() {
           <h1 className="auth-title">Welcome Back</h1>
           <p className="auth-subtitle">Sign in to your LuxeStay account</p>
         </div>
+
+        {searchParams.get('redirect') && (
+          <div className="auth-info-banner">
+            Please sign in or create an account to complete your hotel reservation.
+          </div>
+        )}
 
         {error && <div className="auth-error">{error}</div>}
 
@@ -80,7 +88,9 @@ export default function Login() {
 
         <p className="auth-switch">
           Don't have an account?{' '}
-          <Link to="/register">Create one free</Link>
+          <Link to={`/register${searchParams.get('redirect') ? `?redirect=${encodeURIComponent(redirectTarget)}` : ''}`}>
+            Create one free
+          </Link>
         </p>
       </div>
     </div>

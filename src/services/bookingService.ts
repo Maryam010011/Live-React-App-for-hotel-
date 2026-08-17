@@ -24,6 +24,7 @@ const getAuthHeaders = (): Record<string, string> => {
 
 export interface BookingPayload {
   id?: string;
+  user?: string;
   bookingRef: string;
   hotelId: number | string;
   hotelName: string;
@@ -44,40 +45,51 @@ export interface BookingPayload {
 }
 
 /**
- * Creates a new reservation in MongoDB via POST /api/bookings
+ * Creates a new reservation in MongoDB via POST /api/bookings (Requires Auth)
  */
 export const createBooking = async (bookingData: Partial<BookingPayload>): Promise<BookingPayload> => {
   const endpoint = `${API_BASE_URL}/api/bookings`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(bookingData),
+  });
+
+  if (!response.ok) {
+    const errJson = await response.json().catch(() => ({}));
+    const message = errJson.message || `API responded with status ${response.status}`;
+    console.error(`❌ [bookingService] createBooking error (${response.status}):`, message);
+    throw new Error(message);
+  }
+
+  const json = await response.json();
+  return json.data;
+};
+
+/**
+ * Fetches the logged-in customer's own bookings via GET /api/bookings/my
+ */
+export const fetchMyBookings = async (): Promise<BookingPayload[]> => {
   try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(bookingData),
+    const response = await fetch(`${API_BASE_URL}/api/bookings/my`, {
+      headers: { ...getAuthHeaders() },
     });
-
     if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      const message = errJson.message || `API responded with status ${response.status}`;
-      console.error(`❌ [bookingService] createBooking error (${response.status}):`, message);
-      throw new Error(message);
+      throw new Error(`API responded with status ${response.status}`);
     }
-
     const json = await response.json();
-    return json.data;
+    return json.data || [];
   } catch (error) {
-    console.warn('⚠️ [bookingService] Failed to post booking to API. Check backend connectivity & MONGODB_URI/RESEND_API_KEY environment variables:', error);
-    return {
-      ...(bookingData as BookingPayload),
-      bookingRef: bookingData.bookingRef || 'LX-' + Math.floor(100000 + Math.random() * 900000),
-    };
+    console.warn('[bookingService] Failed to fetch customer bookings:', error);
+    return [];
   }
 };
 
-
 /**
- * Fetches all bookings via GET /api/bookings
+ * Fetches all bookings via GET /api/bookings (Admin only)
  */
 export const fetchBookings = async (): Promise<BookingPayload[]> => {
   try {
