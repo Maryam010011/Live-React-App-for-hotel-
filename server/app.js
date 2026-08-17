@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import mongoose from 'mongoose';
 import { connectDB } from './config/db.js';
 import hotelRoutes from './routes/hotelRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
@@ -9,25 +10,15 @@ dotenv.config();
 
 const app = express();
 
-// Connect to MongoDB
-connectDB();
-
-// CORS configuration (supports deployed Vercel origin and local dev)
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
-  'https://reacthotelbooking.vercel.app',
-];
-
+// CORS configuration (supports local dev and Vercel production)
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, serverless)
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      // Allow requests with no origin (e.g. mobile apps, curl) or any vercel.app / localhost domain
+      if (!origin || origin.endsWith('.vercel.app') || origin.startsWith('http://localhost')) {
         callback(null, true);
       } else {
-        callback(null, true); // Permissive for production compatibility
+        callback(null, true);
       }
     },
     credentials: true,
@@ -37,18 +28,47 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Healthcheck / API root
+// Database connection middleware - guarantees DB is connected before any handler runs
+app.use(async (req, res, next) => {
+  // Allow healthcheck to return state without blocking
+  if (req.path === '/api/health') {
+    return next();
+  }
+
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    console.error('❌ Request intercepted: MongoDB connection failure:', err.message);
+    return res.status(503).json({
+      status: 'error',
+      message: 'Database connection failed. Please verify MONGODB_URI in environment variables.',
+      error: err.message,
+    });
+  }
+});
+
+// Healthcheck endpoint
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'LuxeStay Hotel API is running' });
+  const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const dbState = states[mongoose.connection.readyState] || 'unknown';
+  res.status(200).json({
+    status: 'ok',
+    message: 'LuxeStay Hotel API is running',
+    database: {
+      status: dbState,
+      readyState: mongoose.connection.readyState,
+    },
+  });
 });
 
 // API Routes
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/bookings', bookingRoutes);
 
-// 404 Handler for unrecognized API routes
+// 404 handler for unrecognized API endpoints
 app.use('/api', (req, res) => {
-  res.status(404).json({ status: 'fail', message: 'API Endpoint Not Found' });
+  res.status(404).json({ status: 'fail', message: `API route ${req.originalUrl} not found` });
 });
 
 export default app;
