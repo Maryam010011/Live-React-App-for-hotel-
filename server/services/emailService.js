@@ -3,8 +3,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const resendApiKey = process.env.RESEND_API_KEY;
-const resend = resendApiKey ? new Resend(resendApiKey) : null;
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
+}
 
 /**
  * Generates an elegant HTML template for booking confirmation emails
@@ -289,8 +292,9 @@ function generateBookingEmailHtml(booking) {
  * @returns {Promise<Object>} Resend response object or null
  */
 export async function sendBookingConfirmationEmail(booking) {
+  const resend = getResendClient();
   if (!resend) {
-    console.warn('⚠️ [Resend] RESEND_API_KEY is not configured in .env. Skipping email dispatch.');
+    console.warn('⚠️ [Resend] RESEND_API_KEY is not configured in environment variables. Skipping email dispatch.');
     return null;
   }
 

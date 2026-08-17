@@ -4,6 +4,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+if (!process.env.VERCEL) {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+  } catch (e) {}
+}
+
 // Fail immediately if database is not connected rather than waiting for 10s buffering timeout
 mongoose.set('bufferCommands', false);
 

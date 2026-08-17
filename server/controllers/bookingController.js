@@ -97,10 +97,12 @@ export const createBooking = async (req, res) => {
       status: 'confirmed',
     });
 
-    // Trigger real confirmation email asynchronously (does not block HTTP response or fail booking)
-    sendBookingConfirmationEmail(newBooking).catch((emailErr) => {
-      console.error('❌ [Resend] Unhandled email error:', emailErr);
-    });
+    // Send confirmation email via Resend (awaited so serverless lambdas do not freeze mid-flight)
+    try {
+      await sendBookingConfirmationEmail(newBooking);
+    } catch (emailErr) {
+      console.error('⚠️ [Resend] Non-fatal email sending error:', emailErr.message || emailErr);
+    }
 
     return res.status(201).json({
       status: 'success',
