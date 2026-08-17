@@ -1,4 +1,5 @@
 import { BookingModel } from '../models/Booking.js';
+import { sendBookingConfirmationEmail } from '../services/emailService.js';
 
 // GET /api/bookings
 export const getBookings = async (req, res) => {
@@ -94,6 +95,11 @@ export const createBooking = async (req, res) => {
       paymentMethod: paymentMethod || 'card',
       totalPrice: Number(totalPrice),
       status: 'confirmed',
+    });
+
+    // Trigger real confirmation email asynchronously (does not block HTTP response or fail booking)
+    sendBookingConfirmationEmail(newBooking).catch((emailErr) => {
+      console.error('❌ [Resend] Unhandled email error:', emailErr);
     });
 
     return res.status(201).json({
