@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Hotel } from '../types/hotel';
 import { fetchHotelById } from '../services/hotelService';
 import { createBooking } from '../services/bookingService';
+import { validateName, validateEmail, validatePhone } from '../utils/validation';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import './Booking.css';
@@ -26,6 +27,8 @@ interface BookingFormData {
   cardName: string;
 }
 
+type ValidatedField = 'firstName' | 'lastName' | 'email' | 'phone' | 'cardName';
+
 function Booking() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -37,6 +40,46 @@ function Booking() {
   const [submitting, setSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [bookingRef, setBookingRef] = useState('');
+
+  // Field validation state
+  const [touched, setTouched] = useState<Record<ValidatedField, boolean>>({
+    firstName: false,
+    lastName: false,
+    email: false,
+    phone: false,
+    cardName: false,
+  });
+
+  const [fieldErrors, setFieldErrors] = useState<Record<ValidatedField, string | null>>({
+    firstName: null,
+    lastName: null,
+    email: null,
+    phone: null,
+    cardName: null,
+  });
+
+  const validateField = (field: ValidatedField, value: string): string | null => {
+    switch (field) {
+      case 'firstName':
+        return validateName(value, 'First name');
+      case 'lastName':
+        return validateName(value, 'Last name');
+      case 'email':
+        return validateEmail(value);
+      case 'phone':
+        return validatePhone(value);
+      case 'cardName':
+        return formData.paymentMethod === 'card' ? validateName(value, 'Cardholder name') : null;
+      default:
+        return null;
+    }
+  };
+
+  const handleBlur = (field: ValidatedField) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const val = formData[field];
+    setFieldErrors((prev) => ({ ...prev, [field]: validateField(field, val) }));
+  };
 
   // Default dates: check-in tomorrow, check-out 3 days later
   const tomorrow = new Date();
@@ -134,12 +177,46 @@ function Booking() {
 
   const handleInputChange = (field: keyof BookingFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (touched[field as ValidatedField]) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        [field]: validateField(field as ValidatedField, value),
+      }));
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) {
       navigate(`/login?redirect=/book/${id}`);
+      return;
+    }
+
+    // Run all field validations on submit
+    const fnErr = validateName(formData.firstName, 'First name');
+    const lnErr = validateName(formData.lastName, 'Last name');
+    const emErr = validateEmail(formData.email);
+    const phErr = validatePhone(formData.phone);
+    const cnErr = formData.paymentMethod === 'card' ? validateName(formData.cardName, 'Cardholder name') : null;
+
+    setTouched({
+      firstName: true,
+      lastName: true,
+      email: true,
+      phone: true,
+      cardName: true,
+    });
+
+    const newErrors = {
+      firstName: fnErr,
+      lastName: lnErr,
+      email: emErr,
+      phone: phErr,
+      cardName: cnErr,
+    };
+    setFieldErrors(newErrors);
+
+    if (fnErr || lnErr || emErr || phErr || cnErr) {
       return;
     }
 
@@ -341,7 +418,7 @@ function Booking() {
 
       <div className="booking-layout">
         {/* Main Form Left Column */}
-        <form className="booking-form" onSubmit={handleSubmit}>
+        <form className="booking-form" onSubmit={handleSubmit} noValidate>
           
           {/* Step 1: Guest Information */}
           <div className="form-card">
@@ -359,39 +436,62 @@ function Booking() {
                   type="text"
                   required
                   placeholder="e.g. John"
+                  className={touched.firstName && fieldErrors.firstName ? 'input-has-error' : ''}
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  onBlur={() => handleBlur('firstName')}
                 />
+                {touched.firstName && fieldErrors.firstName && (
+                  <span className="field-error-msg">{fieldErrors.firstName}</span>
+                )}
               </div>
+
               <div className="input-group">
                 <label>Last Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Doe"
+                  className={touched.lastName && fieldErrors.lastName ? 'input-has-error' : ''}
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  onBlur={() => handleBlur('lastName')}
                 />
+                {touched.lastName && fieldErrors.lastName && (
+                  <span className="field-error-msg">{fieldErrors.lastName}</span>
+                )}
               </div>
+
               <div className="input-group">
                 <label>Email Address *</label>
                 <input
                   type="email"
                   required
                   placeholder="john@example.com"
+                  className={touched.email && fieldErrors.email ? 'input-has-error' : ''}
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
+                  onBlur={() => handleBlur('email')}
                 />
+                {touched.email && fieldErrors.email && (
+                  <span className="field-error-msg">{fieldErrors.email}</span>
+                )}
               </div>
+
               <div className="input-group">
                 <label>Phone Number *</label>
                 <input
                   type="tel"
                   required
                   placeholder="+1 (555) 000-0000"
+                  className={touched.phone && fieldErrors.phone ? 'input-has-error' : ''}
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
+                  onBlur={() => handleBlur('phone')}
                 />
+                {touched.phone && fieldErrors.phone && (
+                  <span className="field-error-msg">{fieldErrors.phone}</span>
+                )}
               </div>
             </div>
           </div>
@@ -534,9 +634,14 @@ function Booking() {
                     type="text"
                     required
                     placeholder="Name as printed on card"
+                    className={touched.cardName && fieldErrors.cardName ? 'input-has-error' : ''}
                     value={formData.cardName}
                     onChange={(e) => handleInputChange('cardName', e.target.value)}
+                    onBlur={() => handleBlur('cardName')}
                   />
+                  {touched.cardName && fieldErrors.cardName && (
+                    <span className="field-error-msg">{fieldErrors.cardName}</span>
+                  )}
                 </div>
                 <div className="input-group full-width">
                   <label>Card Number</label>

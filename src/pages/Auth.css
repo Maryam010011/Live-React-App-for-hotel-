@@ -75,6 +75,19 @@
   line-height: 1.5;
 }
 
+.field-error-msg {
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-top: 0.35rem;
+  display: block;
+}
+
+input.input-has-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
 /* ─── Form Fields ─────────────────────────────────────────────────────────── */
 .auth-form {
   display: flex;

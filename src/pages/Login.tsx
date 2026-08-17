@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { validateEmail } from '../utils/validation';
 import './Auth.css';
 
 export default function Login() {
@@ -14,9 +15,28 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Field validation state
+  const [touched, setTouched] = useState<{ email?: boolean }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string | null }>({});
+
+  const handleBlur = (field: 'email') => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    if (field === 'email') {
+      setFieldErrors((prev) => ({ ...prev, email: validateEmail(email) }));
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate all fields on submit
+    const emailErr = validateEmail(email);
+    setTouched({ email: true });
+    setFieldErrors({ email: emailErr });
+
+    if (emailErr) return;
+
     setLoading(true);
     try {
       await login(email, password);
@@ -50,7 +70,7 @@ export default function Login() {
 
         {error && <div className="auth-error">{error}</div>}
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
             <label htmlFor="login-email">Email Address</label>
             <input
@@ -58,10 +78,20 @@ export default function Login() {
               type="email"
               required
               placeholder="you@example.com"
+              className={touched.email && fieldErrors.email ? 'input-has-error' : ''}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (touched.email) {
+                  setFieldErrors((prev) => ({ ...prev, email: validateEmail(e.target.value) }));
+                }
+              }}
+              onBlur={() => handleBlur('email')}
               autoComplete="email"
             />
+            {touched.email && fieldErrors.email && (
+              <span className="field-error-msg">{fieldErrors.email}</span>
+            )}
           </div>
 
           <div className="auth-field">
