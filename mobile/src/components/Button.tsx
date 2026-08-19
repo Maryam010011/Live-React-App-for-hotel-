@@ -1,31 +1,45 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 import { COLORS } from '../constants/colors';
-import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants/theme';
+import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 
 interface ButtonProps {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'danger' | 'outline';
+  variant?: 'primary' | 'secondary' | 'gold' | 'dark' | 'danger' | 'outline';
+  size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  icon?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   title,
   onPress,
   variant = 'primary',
+  size = 'md',
   loading = false,
   disabled = false,
   style,
   textStyle,
+  icon,
 }) => {
   const getButtonStyle = () => {
     switch (variant) {
       case 'secondary':
-        return styles.secondaryButton;
+      case 'gold':
+        return styles.goldButton;
+      case 'dark':
+        return styles.darkButton;
       case 'danger':
         return styles.dangerButton;
       case 'outline':
@@ -44,6 +58,17 @@ export const Button: React.FC<ButtonProps> = ({
     }
   };
 
+  const getSizeStyle = () => {
+    switch (size) {
+      case 'sm':
+        return styles.sizeSm;
+      case 'lg':
+        return styles.sizeLg;
+      default:
+        return styles.sizeMd;
+    }
+  };
+
   const getLoaderColor = () => {
     return variant === 'outline' ? COLORS.PRIMARY : COLORS.WHITE;
   };
@@ -53,17 +78,21 @@ export const Button: React.FC<ButtonProps> = ({
       style={[
         styles.button,
         getButtonStyle(),
+        getSizeStyle(),
         disabled || loading ? styles.disabled : null,
         style,
       ]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      activeOpacity={0.88}
     >
       {loading ? (
         <ActivityIndicator size="small" color={getLoaderColor()} />
       ) : (
-        <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        <>
+          {icon ? <>{icon}</> : null}
+          <Text style={[getTextStyle(), textStyle]}>{title}</Text>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -71,20 +100,35 @@ export const Button: React.FC<ButtonProps> = ({
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: SPACING.MD - 2,
-    paddingHorizontal: SPACING.LG,
     borderRadius: BORDER_RADIUS.MD,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    width: '100%',
-    marginVertical: SPACING.XS,
+    gap: SPACING.SM,
+  },
+  sizeSm: {
+    paddingVertical: SPACING.XS + 4,
+    paddingHorizontal: SPACING.MD,
+  },
+  sizeMd: {
+    paddingVertical: SPACING.SM + 4,
+    paddingHorizontal: SPACING.LG,
+  },
+  sizeLg: {
+    paddingVertical: SPACING.MD,
+    paddingHorizontal: SPACING.XL,
   },
   primaryButton: {
     backgroundColor: COLORS.PRIMARY,
+    ...SHADOWS.PRIMARY_GLOW,
   },
-  secondaryButton: {
+  goldButton: {
     backgroundColor: COLORS.SECONDARY,
+    ...SHADOWS.GOLD_GLOW,
+  },
+  darkButton: {
+    backgroundColor: COLORS.NAVY_DARK,
+    ...SHADOWS.MD,
   },
   dangerButton: {
     backgroundColor: COLORS.ERROR,
@@ -98,14 +142,16 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   btnText: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontWeight: '700',
     color: COLORS.WHITE,
+    letterSpacing: 0.2,
   },
   outlineText: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontWeight: '700',
     color: COLORS.PRIMARY,
+    letterSpacing: 0.2,
   },
 });
 

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, StatusBar } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { searchHotels } from '../api/hotelApi';
 import { Hotel } from '../types/hotel';
 import { COLORS } from '../constants/colors';
-import { FONT_SIZE, SPACING } from '../constants/theme';
+import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 import HotelCard from '../components/HotelCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -14,7 +14,7 @@ import EmptyState from '../components/EmptyState';
 type Props = NativeStackScreenProps<RootStackParamList, 'HotelList'>;
 
 export default function HotelListScreen({ route, navigation }: Props) {
-  const { city, minPrice, maxPrice, minRating } = route.params;
+  const { city, minPrice, maxPrice, minRating } = route.params || {};
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +58,20 @@ export default function HotelListScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY} />
+      {/* Search Header Banner matching web app */}
+      <View style={styles.searchHeaderBanner}>
+        <Text style={styles.bannerTag}>LUXESTAY DIRECTORY</Text>
+        <Text style={styles.bannerTitle}>
+          {city ? `Stays in ${city}` : 'All Available Stays'}
+        </Text>
+        <Text style={styles.bannerSubtitle}>
+          Handpicked 5-star properties & luxury boutique hotels
+        </Text>
+      </View>
+
       {loading ? (
-        <LoadingSpinner message="Searching best stays for you..." fullScreen />
+        <LoadingSpinner message="Finding luxury stays for you..." fullScreen />
       ) : error ? (
         <ErrorMessage message={error} onRetry={() => loadHotels()} />
       ) : (
@@ -70,23 +82,21 @@ export default function HotelListScreen({ route, navigation }: Props) {
           contentContainerStyle={styles.listContainer}
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          initialNumToRender={5}
+          initialNumToRender={6}
           maxToRenderPerBatch={10}
           windowSize={5}
           ListHeaderComponent={
-            <View style={styles.header}>
-              <Text style={styles.title}>
-                {city ? `Stays in ${city}` : 'All Available Stays'}
-              </Text>
-              <Text style={styles.subtitle}>
-                Found {hotels.length} luxury propert{hotels.length === 1 ? 'y' : 'ies'}
+            <View style={styles.resultsBar}>
+              <Text style={styles.resultsText}>
+                Showing <Text style={styles.resultsCount}>{hotels.length}</Text>{' '}
+                luxury propert{hotels.length === 1 ? 'y' : 'ies'}
               </Text>
             </View>
           }
           ListEmptyComponent={
             <EmptyState
               message="No Hotels Matching Your Criteria"
-              suggestion="Try widening your search location or clearing filter ranges"
+              suggestion="Try clearing your filters or exploring another destination"
               icon="🏖️"
             />
           }
@@ -99,23 +109,49 @@ export default function HotelListScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
+  },
+  searchHeaderBanner: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingVertical: SPACING.LG,
+    paddingHorizontal: SPACING.MD,
+    alignItems: 'center',
+    ...SHADOWS.MD,
+  },
+  bannerTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.SECONDARY_MUTED,
+    letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  bannerTitle: {
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
+    color: COLORS.WHITE,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  bannerSubtitle: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.PRIMARY_SURFACE,
+    marginTop: 4,
+    textAlign: 'center',
   },
   listContainer: {
     padding: SPACING.MD,
-    paddingBottom: SPACING.XL,
+    paddingBottom: SPACING.XXL,
   },
-  header: {
+  resultsBar: {
     marginBottom: SPACING.MD,
   },
-  title: {
-    fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
-  },
-  subtitle: {
+  resultsText: {
     fontSize: FONT_SIZE.BODY_MEDIUM,
     color: COLORS.TEXT_SECONDARY,
-    marginTop: 2,
+    fontWeight: '500',
+  },
+  resultsCount: {
+    fontWeight: '800',
+    color: COLORS.PRIMARY,
   },
 });

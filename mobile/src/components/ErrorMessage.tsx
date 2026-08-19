@@ -15,7 +15,7 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, onRetry }) 
       <Text style={styles.message}>{message}</Text>
       {onRetry && (
         <TouchableOpacity style={styles.button} onPress={onRetry}>
-          <Text style={styles.buttonText}>Retry</Text>
+          <Text style={styles.buttonText}>Try Again</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -25,34 +25,36 @@ export const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, onRetry }) 
 const styles = StyleSheet.create({
   container: {
     padding: SPACING.LG,
-    backgroundColor: '#fff5f5',
+    backgroundColor: COLORS.ERROR_BG,
     borderWidth: 1,
-    borderColor: '#feb2b2',
-    borderRadius: BORDER_RADIUS.MD,
+    borderColor: COLORS.ERROR_BORDER,
+    borderRadius: BORDER_RADIUS.LG,
     alignItems: 'center',
     justifyContent: 'center',
     margin: SPACING.MD,
   },
   icon: {
-    fontSize: 32,
+    fontSize: 28,
     marginBottom: SPACING.SM,
   },
   message: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.ERROR,
     textAlign: 'center',
+    fontWeight: '600',
     marginBottom: SPACING.MD,
+    lineHeight: 18,
   },
   button: {
     paddingVertical: SPACING.SM,
     paddingHorizontal: SPACING.LG,
     backgroundColor: COLORS.ERROR,
-    borderRadius: BORDER_RADIUS.SM,
+    borderRadius: BORDER_RADIUS.MD,
   },
   buttonText: {
     color: COLORS.WHITE,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontWeight: '700',
+    fontSize: FONT_SIZE.BODY_SMALL,
   },
 });
 

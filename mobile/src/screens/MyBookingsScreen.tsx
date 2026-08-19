@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, RefreshControl, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  SafeAreaView,
+  RefreshControl,
+  TouchableOpacity,
+  StatusBar,
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { fetchMyBookings } from '../api/bookingApi';
 import { BookingPayload } from '../types/booking';
@@ -13,7 +22,7 @@ import Button from '../components/Button';
 
 export default function MyBookingsScreen({ navigation }: any) {
   const { user } = useAuth();
-  
+
   const [bookings, setBookings] = useState<BookingPayload[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,85 +52,125 @@ export default function MyBookingsScreen({ navigation }: any) {
     loadBookings(true);
   };
 
-  const getStatusStyle = (status = 'confirmed') => {
+  const getStatusBadgeStyle = (status = 'confirmed') => {
     switch (status.toLowerCase()) {
       case 'cancelled':
-        return styles.statusCancelled;
+        return {
+          bg: COLORS.ERROR_BG,
+          border: COLORS.ERROR_BORDER,
+          text: COLORS.ERROR,
+        };
       case 'pending':
-        return styles.statusPending;
+        return {
+          bg: COLORS.WARNING_BG,
+          border: COLORS.WARNING_BORDER,
+          text: COLORS.WARNING,
+        };
       default:
-        return styles.statusConfirmed;
+        return {
+          bg: COLORS.SUCCESS_BG,
+          border: COLORS.SUCCESS_BORDER,
+          text: COLORS.SUCCESS,
+        };
     }
   };
 
-  const renderBookingItem = useCallback(({ item }: { item: BookingPayload }) => {
-    return (
-      <View style={styles.bookingCard}>
-        {/* Card Header */}
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.refText}>Ref: {item.bookingRef}</Text>
-            <Text style={styles.hotelName}>{item.hotelName}</Text>
+  const renderBookingItem = useCallback(
+    ({ item }: { item: BookingPayload }) => {
+      const badgeStyle = getStatusBadgeStyle(item.status);
+
+      return (
+        <View style={styles.bookingCard}>
+          {/* Card Header */}
+          <View style={styles.cardHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.refBadge}>
+                <Text style={styles.refText}>Ref: {item.bookingRef}</Text>
+              </View>
+              <Text style={styles.hotelName}>{item.hotelName}</Text>
+            </View>
+
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: badgeStyle.bg,
+                  borderColor: badgeStyle.border,
+                },
+              ]}
+            >
+              <Text style={[styles.statusText, { color: badgeStyle.text }]}>
+                {(item.status || 'confirmed').toUpperCase()}
+              </Text>
+            </View>
           </View>
-          <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
-            <Text style={styles.statusText}>{(item.status || 'confirmed').toUpperCase()}</Text>
+
+          {/* Card Body Grid */}
+          <View style={styles.cardBodyGrid}>
+            <View style={styles.infoCol}>
+              <Text style={styles.infoLabel}>CHECK-IN</Text>
+              <Text style={styles.infoVal}>{formatDate(item.checkIn)}</Text>
+            </View>
+            <View style={styles.infoCol}>
+              <Text style={styles.infoLabel}>CHECK-OUT</Text>
+              <Text style={styles.infoVal}>{formatDate(item.checkOut)}</Text>
+            </View>
+            <View style={styles.infoCol}>
+              <Text style={styles.infoLabel}>ROOM TIER</Text>
+              <Text style={[styles.infoVal, styles.capitalize]}>
+                {item.roomType} Room
+              </Text>
+            </View>
+            <View style={styles.infoCol}>
+              <Text style={styles.infoLabel}>GUESTS</Text>
+              <Text style={styles.infoVal}>
+                {item.adults} Adult{item.adults > 1 ? 's' : ''}
+                {item.children > 0 ? `, ${item.children} Child` : ''}
+              </Text>
+            </View>
+          </View>
+
+          {/* Card Footer */}
+          <View style={styles.cardFooter}>
+            <View style={styles.guestInfo}>
+              <Text style={styles.guestName}>
+                👤 {item.firstName} {item.lastName}
+              </Text>
+              <Text style={styles.guestEmail}>{item.email}</Text>
+            </View>
+            <View style={styles.totalBox}>
+              <Text style={styles.totalLabel}>TOTAL PAID</Text>
+              <Text style={styles.totalValue}>
+                {formatPrice(item.totalPrice)}
+              </Text>
+            </View>
           </View>
         </View>
+      );
+    },
+    []
+  );
 
-        {/* Card Body */}
-        <View style={styles.cardBody}>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Check-In</Text>
-            <Text style={styles.infoVal}>{formatDate(item.checkIn)}</Text>
-          </View>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Check-Out</Text>
-            <Text style={styles.infoVal}>{formatDate(item.checkOut)}</Text>
-          </View>
-        </View>
+  const keyExtractor = useCallback(
+    (item: BookingPayload) => String(item.id || item._id || item.bookingRef),
+    []
+  );
 
-        <View style={styles.cardBodySub}>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Room Category</Text>
-            <Text style={[styles.infoVal, { textTransform: 'capitalize' }]}>{item.roomType} Room</Text>
-          </View>
-          <View style={styles.infoCol}>
-            <Text style={styles.infoLabel}>Guests</Text>
-            <Text style={styles.infoVal}>
-              {item.adults} Adult{item.adults > 1 ? 's' : ''}
-              {item.children > 0 ? `, ${item.children} Child` : ''}
-            </Text>
-          </View>
-        </View>
-
-        {/* Card Footer */}
-        <View style={styles.cardFooter}>
-          <View>
-            <Text style={styles.guestLabel}>Primary Guest</Text>
-            <Text style={styles.guestValue}>{item.firstName} {item.lastName}</Text>
-          </View>
-          <View style={styles.totalBox}>
-            <Text style={styles.totalLabel}>Total Paid</Text>
-            <Text style={styles.totalValue}>{formatPrice(item.totalPrice)}</Text>
-          </View>
-        </View>
-      </View>
-    );
-  }, []);
-
-  const keyExtractor = useCallback((item: BookingPayload) => String(item.id || item._id || item.bookingRef), []);
-
-  // Redirect if visitor not logged in
   if (!user) {
     return (
       <SafeAreaView style={styles.centerContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.BG_PAGE} />
         <View style={styles.authBox}>
           <Text style={styles.authIcon}>🏨</Text>
           <Text style={styles.authTitle}>My Reservations</Text>
           <Text style={styles.authText}>
             Please sign in to view and manage your LuxeStay hotel bookings.
           </Text>
-          <Button title="Sign In" onPress={() => navigation.navigate('Login')} />
+          <Button
+            title="Sign In to LuxeStay"
+            onPress={() => navigation.navigate('Login')}
+            size="lg"
+          />
         </View>
       </SafeAreaView>
     );
@@ -129,6 +178,24 @@ export default function MyBookingsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY} />
+      {/* Top Banner Header */}
+      <View style={styles.topHeaderBanner}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.bannerTitle}>My Bookings</Text>
+          <Text style={styles.bannerSubtitle}>
+            Manage and view details for all your hotel reservations
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.bookAnotherBtn}
+          onPress={() => navigation.navigate('Home')}
+          activeOpacity={0.88}
+        >
+          <Text style={styles.bookAnotherBtnText}>+ Book Stays</Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <LoadingSpinner message="Retrieving your reservations..." fullScreen />
       ) : error ? (
@@ -139,6 +206,7 @@ export default function MyBookingsScreen({ navigation }: any) {
           renderItem={renderBookingItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -146,18 +214,10 @@ export default function MyBookingsScreen({ navigation }: any) {
               colors={[COLORS.PRIMARY]}
             />
           }
-          ListHeaderComponent={
-            <View style={styles.header}>
-              <Text style={styles.title}>My Bookings</Text>
-              <Text style={styles.subtitle}>
-                You have {bookings.length} active reservation{bookings.length === 1 ? '' : 's'}
-              </Text>
-            </View>
-          }
           ListEmptyComponent={
             <EmptyState
               message="No Reservations Found"
-              suggestion="Ready to plan your next stay? Head over to the Explore tab!"
+              suggestion="You haven't booked any hotel stays yet. Explore our premier hotel catalog to plan your next retreat!"
               icon="🏨"
             />
           }
@@ -170,24 +230,24 @@ export default function MyBookingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.LG,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   authBox: {
     backgroundColor: COLORS.WHITE,
-    borderRadius: BORDER_RADIUS.LG,
+    borderRadius: BORDER_RADIUS.XL,
     padding: SPACING.XL,
     alignItems: 'center',
     width: '100%',
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    ...SHADOWS.MD,
+    ...SHADOWS.LG,
   },
   authIcon: {
     fontSize: 48,
@@ -195,42 +255,62 @@ const styles = StyleSheet.create({
   },
   authTitle: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.SM,
   },
   authText: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     marginBottom: SPACING.LG,
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  topHeaderBanner: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingVertical: SPACING.LG,
+    paddingHorizontal: SPACING.MD,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: SPACING.MD,
+    ...SHADOWS.MD,
+  },
+  bannerTitle: {
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
+    color: COLORS.WHITE,
+    letterSpacing: -0.3,
+  },
+  bannerSubtitle: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.PRIMARY_SURFACE,
+    marginTop: 2,
+  },
+  bookAnotherBtn: {
+    backgroundColor: COLORS.SECONDARY,
+    paddingVertical: SPACING.SM,
+    paddingHorizontal: SPACING.MD,
+    borderRadius: BORDER_RADIUS.MD,
+    ...SHADOWS.GOLD_GLOW,
+  },
+  bookAnotherBtnText: {
+    color: COLORS.WHITE,
+    fontWeight: '800',
+    fontSize: FONT_SIZE.BODY_SMALL,
   },
   listContainer: {
     padding: SPACING.MD,
-    paddingBottom: SPACING.XL,
-  },
-  header: {
-    marginBottom: SPACING.MD,
-  },
-  title: {
-    fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_SECONDARY,
-    marginTop: 2,
+    paddingBottom: SPACING.XXL,
   },
   bookingCard: {
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.LG,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    marginBottom: SPACING.MD,
-    padding: SPACING.MD,
-    ...SHADOWS.SM,
+    marginBottom: SPACING.MD + 2,
+    padding: SPACING.LG,
+    ...SHADOWS.MD,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -238,81 +318,87 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BG_SECONDARY,
-    paddingBottom: SPACING.SM,
-    marginBottom: SPACING.SM,
+    paddingBottom: SPACING.MD,
+    marginBottom: SPACING.MD,
+    gap: SPACING.SM,
+  },
+  refBadge: {
+    backgroundColor: COLORS.PRIMARY_SURFACE,
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: BORDER_RADIUS.SM,
+    alignSelf: 'flex-start',
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY_TINT,
   },
   refText: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: COLORS.PRIMARY,
     letterSpacing: 0.5,
   },
   hotelName: {
-    fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_LARGE + 1,
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
-    marginTop: 2,
+    letterSpacing: -0.2,
   },
   statusBadge: {
-    paddingVertical: 3,
-    paddingHorizontal: SPACING.SM,
-    borderRadius: BORDER_RADIUS.SM,
-  },
-  statusConfirmed: {
-    backgroundColor: '#DEF7EC',
-  },
-  statusPending: {
-    backgroundColor: '#FEF3C7',
-  },
-  statusCancelled: {
-    backgroundColor: '#FDE8E8',
+    paddingVertical: 4,
+    paddingHorizontal: SPACING.SM + 2,
+    borderRadius: BORDER_RADIUS.ROUND,
+    borderWidth: 1,
   },
   statusText: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  cardBody: {
+  cardBodyGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: SPACING.SM,
-  },
-  cardBodySub: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.BG_SECONDARY,
-    paddingBottom: SPACING.SM,
-    marginBottom: SPACING.SM,
+    rowGap: SPACING.MD,
+    marginBottom: SPACING.MD,
   },
   infoCol: {
     width: '48%',
   },
   infoLabel: {
     fontSize: 10,
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.6,
+    marginBottom: 2,
   },
   infoVal: {
     fontSize: FONT_SIZE.BODY_MEDIUM,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.TEXT_PRIMARY,
-    marginTop: 2,
+  },
+  capitalize: {
+    textTransform: 'capitalize',
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BG_SECONDARY,
+    paddingTop: SPACING.MD - 2,
   },
-  guestLabel: {
-    fontSize: 9,
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
+  guestInfo: {
+    flex: 1,
   },
-  guestValue: {
+  guestName: {
     fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.TEXT_PRIMARY,
+  },
+  guestEmail: {
+    fontSize: 11,
+    color: COLORS.TEXT_SECONDARY,
     marginTop: 1,
   },
   totalBox: {
@@ -320,13 +406,14 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 9,
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.6,
   },
   totalValue: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.H3,
+    fontWeight: '900',
     color: COLORS.PRIMARY,
-    marginTop: 1,
+    letterSpacing: -0.3,
   },
 });

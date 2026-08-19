@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useAuth } from '../context/AuthContext';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { COLORS } from '../constants/colors';
-import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants/theme';
+import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 
@@ -15,10 +25,10 @@ export default function LoginScreen({ route, navigation }: Props) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
+
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
 
@@ -26,7 +36,6 @@ export default function LoginScreen({ route, navigation }: Props) {
   const redirectParams = route.params?.redirectParams;
 
   const handleLogin = async () => {
-    // Validate inputs
     const emailVal = validateEmail(email);
     const passVal = validatePassword(password);
 
@@ -40,8 +49,7 @@ export default function LoginScreen({ route, navigation }: Props) {
 
     try {
       await login(email.trim(), password);
-      
-      // If we need to redirect the user back to where they were (e.g., booking checkout)
+
       if (redirectScreen) {
         navigation.replace(redirectScreen as any, redirectParams);
       } else {
@@ -56,17 +64,29 @@ export default function LoginScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.BG_PAGE} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          <View style={styles.header}>
-            <Text style={styles.brandTitle}>LuxeStay</Text>
-            <Text style={styles.subtitle}>Log in to manage hotel bookings and access administrative features</Text>
-          </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Card matching Auth.css */}
+          <View style={styles.authCard}>
+            {/* Logo Badge */}
+            <View style={styles.header}>
+              <View style={styles.authLogoBox}>
+                <Text style={styles.authLogoIcon}>🏨</Text>
+              </View>
+              <Text style={styles.authTitle}>Welcome Back</Text>
+              <Text style={styles.authSubtitle}>
+                Sign in to manage bookings and access exclusive stays
+              </Text>
+            </View>
 
-          <View style={styles.formCard}>
             {generalError ? (
               <View style={styles.errorBanner}>
                 <Text style={styles.errorText}>{generalError}</Text>
@@ -75,7 +95,7 @@ export default function LoginScreen({ route, navigation }: Props) {
 
             <InputField
               label="Email Address"
-              placeholder="john@example.com"
+              placeholder="e.g. john@example.com"
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -102,10 +122,12 @@ export default function LoginScreen({ route, navigation }: Props) {
             />
 
             <Button
-              title="Log In"
+              title="Sign In to LuxeStay"
+              variant="dark"
               onPress={handleLogin}
               loading={loading}
               style={styles.loginBtn}
+              size="lg"
             />
 
             <View style={styles.signupContainer}>
@@ -115,7 +137,7 @@ export default function LoginScreen({ route, navigation }: Props) {
                   navigation.replace('Register', { redirectScreen, redirectParams })
                 }
               >
-                <Text style={styles.signupLink}>Sign Up</Text>
+                <Text style={styles.signupLink}>Create Account</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -128,7 +150,7 @@ export default function LoginScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   keyboardView: {
     flex: 1,
@@ -138,40 +160,57 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: SPACING.LG,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING.XL,
-  },
-  brandTitle: {
-    fontSize: FONT_SIZE.H1 + 4,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
-    marginBottom: SPACING.XS,
-  },
-  subtitle: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_SECONDARY,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.MD,
-  },
-  formCard: {
+  authCard: {
     backgroundColor: COLORS.WHITE,
-    borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
+    borderRadius: BORDER_RADIUS.XL,
+    padding: SPACING.LG + 4,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
+    ...SHADOWS.LG,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: SPACING.LG,
+  },
+  authLogoBox: {
+    width: 60,
+    height: 60,
+    borderRadius: BORDER_RADIUS.LG,
+    backgroundColor: COLORS.NAVY_DARK,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.MD,
+    ...SHADOWS.MD,
+  },
+  authLogoIcon: {
+    fontSize: 28,
+  },
+  authTitle: {
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
+    color: COLORS.TEXT_PRIMARY,
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  authSubtitle: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_SECONDARY,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: SPACING.SM,
   },
   errorBanner: {
-    backgroundColor: '#fff5f5',
+    backgroundColor: COLORS.ERROR_BG,
     borderWidth: 1,
-    borderColor: '#feb2b2',
+    borderColor: COLORS.ERROR_BORDER,
     borderRadius: BORDER_RADIUS.MD,
-    padding: SPACING.MD,
+    padding: SPACING.MD - 2,
     marginBottom: SPACING.MD,
   },
   errorText: {
     color: COLORS.ERROR,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
     textAlign: 'center',
   },
   loginBtn: {
@@ -183,12 +222,12 @@ const styles = StyleSheet.create({
     marginTop: SPACING.LG,
   },
   signupText: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
   },
   signupLink: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '800',
     color: COLORS.PRIMARY,
   },
 });

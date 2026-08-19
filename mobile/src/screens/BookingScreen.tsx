@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, SafeAreaView,
-  TouchableOpacity, KeyboardAvoidingView, Platform,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
@@ -73,7 +80,7 @@ export default function BookingScreen({ route, navigation }: Props) {
     roomType: 'standard',
     specialRequests: '',
     paymentMethod: 'card',
-    cardNumber: '4532 8892 7731 2291',
+    cardNumber: '4532 •••• •••• 8892',
     cardExpiry: '08/28',
     cardCvc: '882',
     cardName: '',
@@ -102,7 +109,6 @@ export default function BookingScreen({ route, navigation }: Props) {
     loadHotel();
   }, [id]);
 
-  // Autofill user details when logged in
   useEffect(() => {
     if (user) {
       const nameParts = user.name.split(' ');
@@ -118,7 +124,6 @@ export default function BookingScreen({ route, navigation }: Props) {
     }
   }, [user]);
 
-  // Calculate stay nights from date strings
   const getStayNights = (): number => {
     try {
       const inDate = new Date(formData.checkIn);
@@ -159,11 +164,18 @@ export default function BookingScreen({ route, navigation }: Props) {
     const lnErr = validateName(formData.lastName, 'Last name');
     const emErr = validateEmail(formData.email);
     const phErr = validatePhone(formData.phone);
-    const cardNameErr = formData.paymentMethod === 'card'
-      ? validateName(formData.cardName, 'Cardholder name')
-      : null;
+    const cardNameErr =
+      formData.paymentMethod === 'card'
+        ? validateName(formData.cardName, 'Cardholder name')
+        : null;
 
-    const errors = { firstName: fnErr, lastName: lnErr, email: emErr, phone: phErr, cardName: cardNameErr };
+    const errors = {
+      firstName: fnErr,
+      lastName: lnErr,
+      email: emErr,
+      phone: phErr,
+      cardName: cardNameErr,
+    };
     setFieldErrors(errors);
 
     if (fnErr || lnErr || emErr || phErr || cardNameErr) return;
@@ -202,10 +214,10 @@ export default function BookingScreen({ route, navigation }: Props) {
   };
 
   if (loading) {
-    return <LoadingSpinner message="Pre-loading your checkout form..." fullScreen />;
+    return <LoadingSpinner message="Loading checkout details..." fullScreen />;
   }
 
-  // Redirect unauthenticated visitors
+  // If unauthenticated
   if (!user) {
     return (
       <SafeAreaView style={styles.centerContainer}>
@@ -213,39 +225,61 @@ export default function BookingScreen({ route, navigation }: Props) {
           <Text style={styles.authIcon}>🔐</Text>
           <Text style={styles.authTitle}>Sign In Required</Text>
           <Text style={styles.authText}>
-            You must be logged into your LuxeStay account to book hotel stays.
+            Please sign in to your LuxeStay account to complete your hotel reservation.
           </Text>
           <Button
             title="Sign In to Continue"
-            onPress={() => navigation.navigate('Login', { redirectScreen: 'Booking', redirectParams: { id } })}
+            onPress={() =>
+              navigation.navigate('Login', {
+                redirectScreen: 'Booking',
+                redirectParams: { id },
+              })
+            }
+            size="lg"
           />
           <TouchableOpacity
-            onPress={() => navigation.navigate('Register', { redirectScreen: 'Booking', redirectParams: { id } })}
+            onPress={() =>
+              navigation.navigate('Register', {
+                redirectScreen: 'Booking',
+                redirectParams: { id },
+              })
+            }
             style={styles.authRegisterLink}
           >
-            <Text style={styles.authRegisterLinkText}>Don't have an account? Sign Up</Text>
+            <Text style={styles.authRegisterLinkText}>
+              Don't have an account? Sign Up
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Render booking confirmation receipt
+  // Render Confirmation Receipt View
   if (isConfirmed && hotel) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.receiptContainer}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY} />
+        <ScrollView
+          contentContainerStyle={styles.receiptContainer}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.receiptCard}>
             <View style={styles.successBadge}>
               <Text style={styles.successIcon}>✓</Text>
             </View>
-            <Text style={styles.receiptTitle}>Booking Confirmed!</Text>
+            <Text style={styles.receiptTag}>RESERVATION CONFIRMED</Text>
+            <Text style={styles.receiptTitle}>Your Booking is Complete!</Text>
             <Text style={styles.receiptSubtitle}>
-              Your stay at {hotel.name} is scheduled. A confirmation email was sent to {formData.email}.
+              We have sent a confirmation email to{' '}
+              <Text style={{ fontWeight: '700', color: COLORS.TEXT_PRIMARY }}>
+                {formData.email}
+              </Text>
+              .
             </Text>
 
             <View style={styles.refBox}>
-              <Text style={styles.refLabel}>BOOKING REFERENCE</Text>
+              <Text style={styles.refLabel}>BOOKING REFERENCE NUMBER</Text>
               <Text style={styles.refValue}>{bookingRef}</Text>
             </View>
 
@@ -256,19 +290,34 @@ export default function BookingScreen({ route, navigation }: Props) {
               </View>
               <View style={styles.receiptRow}>
                 <Text style={styles.receiptLabel}>Location</Text>
-                <Text style={styles.receiptVal}>{hotel.city}, {hotel.country}</Text>
+                <Text style={styles.receiptVal}>
+                  {hotel.city}, {hotel.country}
+                </Text>
               </View>
               <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Dates</Text>
-                <Text style={styles.receiptVal}>{formData.checkIn} to {formData.checkOut}</Text>
+                <Text style={styles.receiptLabel}>Guest</Text>
+                <Text style={styles.receiptVal}>
+                  {formData.firstName} {formData.lastName}
+                </Text>
               </View>
               <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Room Type</Text>
-                <Text style={[styles.receiptVal, styles.capitalize]}>{formData.roomType}</Text>
+                <Text style={styles.receiptLabel}>Stay Dates</Text>
+                <Text style={styles.receiptVal}>
+                  {formData.checkIn} to {formData.checkOut} ({nights}{' '}
+                  {nights === 1 ? 'night' : 'nights'})
+                </Text>
               </View>
               <View style={styles.receiptRow}>
-                <Text style={styles.receiptLabel}>Paid Amount</Text>
-                <Text style={[styles.receiptVal, styles.receiptValHighlight]}>{formatPrice(totalPrice)}</Text>
+                <Text style={styles.receiptLabel}>Room Tier</Text>
+                <Text style={[styles.receiptVal, styles.capitalize]}>
+                  {formData.roomType} Room
+                </Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>Total Paid</Text>
+                <Text style={[styles.receiptVal, styles.receiptValHighlight]}>
+                  {formatPrice(totalPrice)} USD
+                </Text>
               </View>
             </View>
 
@@ -276,11 +325,13 @@ export default function BookingScreen({ route, navigation }: Props) {
               title="View My Bookings"
               onPress={() => navigation.navigate(ROUTES.MY_BOOKINGS as any)}
               style={styles.receiptBtn}
+              size="lg"
             />
             <Button
               title="Explore More Hotels"
               variant="outline"
               onPress={() => navigation.navigate('MainTabs')}
+              size="md"
             />
           </View>
         </ScrollView>
@@ -290,10 +341,26 @@ export default function BookingScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          <Text style={styles.hotelHeading}>{hotel?.name}</Text>
-          <Text style={styles.hotelSubheading}>📍 {hotel?.city}, {hotel?.country}</Text>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.PRIMARY} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.pageHeader}>
+            <Text style={styles.hotelHeading}>{hotel?.name}</Text>
+            <Text style={styles.hotelSubheading}>
+              📍 {hotel?.city}, {hotel?.country}
+            </Text>
+            <Text style={styles.guaranteeText}>
+              🔒 Instant confirmation • 256-bit SSL encrypted • Price guarantee
+            </Text>
+          </View>
 
           {error ? (
             <View style={styles.errorBox}>
@@ -301,9 +368,20 @@ export default function BookingScreen({ route, navigation }: Props) {
             </View>
           ) : null}
 
-          {/* Section 1: Guest Information */}
+          {/* ─── Step 1: Guest Information ────────────────────────────────── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>1. Guest Information</Text>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>1</Text>
+              </View>
+              <View>
+                <Text style={styles.cardTitle}>Guest Information</Text>
+                <Text style={styles.cardSubtitle}>
+                  Primary guest details for check-in
+                </Text>
+              </View>
+            </View>
+
             <View style={styles.row}>
               <View style={styles.halfWidth}>
                 <InputField
@@ -345,9 +423,20 @@ export default function BookingScreen({ route, navigation }: Props) {
             />
           </View>
 
-          {/* Section 2: Stay Dates & Room */}
+          {/* ─── Step 2: Stay Dates & Room Tier ───────────────────────────── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>2. Dates & Rooms</Text>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>2</Text>
+              </View>
+              <View>
+                <Text style={styles.cardTitle}>Stay & Room Tier</Text>
+                <Text style={styles.cardSubtitle}>
+                  Select dates and room specification
+                </Text>
+              </View>
+            </View>
+
             <View style={styles.row}>
               <View style={styles.halfWidth}>
                 <InputField
@@ -369,19 +458,35 @@ export default function BookingScreen({ route, navigation }: Props) {
               </View>
             </View>
 
-            <Text style={styles.inputLabel}>Room Tier Selection</Text>
+            <Text style={styles.inputLabel}>Room Category Tier</Text>
             <View style={styles.roomTierRow}>
               {(['standard', 'deluxe', 'suite'] as const).map((tier) => (
                 <TouchableOpacity
                   key={tier}
-                  style={[styles.roomTierPill, formData.roomType === tier && styles.roomTierPillActive]}
+                  style={[
+                    styles.roomTierPill,
+                    formData.roomType === tier && styles.roomTierPillActive,
+                  ]}
                   onPress={() => handleInputChange('roomType', tier)}
+                  activeOpacity={0.88}
                 >
-                  <Text style={[styles.roomTierPillText, formData.roomType === tier && styles.roomTierPillTextActive]}>
+                  <Text
+                    style={[
+                      styles.roomTierPillText,
+                      formData.roomType === tier && styles.roomTierPillTextActive,
+                    ]}
+                  >
                     {tier.charAt(0).toUpperCase() + tier.slice(1)}
                   </Text>
-                  <Text style={[styles.roomTierPillPrice, formData.roomType === tier && styles.roomTierPillTextActive]}>
-                    {formatPrice(Math.round((hotel?.price || 0) * roomMultipliers[tier]))}
+                  <Text
+                    style={[
+                      styles.roomTierPillPrice,
+                      formData.roomType === tier && styles.roomTierPillTextActive,
+                    ]}
+                  >
+                    {formatPrice(
+                      Math.round((hotel?.price || 0) * roomMultipliers[tier])
+                    )}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -389,7 +494,7 @@ export default function BookingScreen({ route, navigation }: Props) {
 
             <InputField
               label="Special Requests (Optional)"
-              placeholder="e.g. high floor, late check-in..."
+              placeholder="High floor, quiet room, late check-in..."
               value={formData.specialRequests}
               onChangeText={(val) => handleInputChange('specialRequests', val)}
               multiline
@@ -397,18 +502,40 @@ export default function BookingScreen({ route, navigation }: Props) {
             />
           </View>
 
-          {/* Section 3: Payment */}
+          {/* ─── Step 3: Payment Options ──────────────────────────────────── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>3. Payment Options</Text>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.stepBadge}>
+                <Text style={styles.stepBadgeText}>3</Text>
+              </View>
+              <View>
+                <Text style={styles.cardTitle}>Payment Information</Text>
+                <Text style={styles.cardSubtitle}>Choose your payment method</Text>
+              </View>
+            </View>
+
             <View style={styles.paymentTabs}>
               {(['card', 'paypal', 'hotel'] as const).map((method) => (
                 <TouchableOpacity
                   key={method}
-                  style={[styles.paymentTab, formData.paymentMethod === method && styles.paymentTabActive]}
+                  style={[
+                    styles.paymentTab,
+                    formData.paymentMethod === method && styles.paymentTabActive,
+                  ]}
                   onPress={() => handleInputChange('paymentMethod', method)}
                 >
-                  <Text style={[styles.paymentTabText, formData.paymentMethod === method && styles.paymentTabTextActive]}>
-                    {method === 'card' ? 'Credit Card' : method === 'paypal' ? 'PayPal' : 'Pay at Hotel'}
+                  <Text
+                    style={[
+                      styles.paymentTabText,
+                      formData.paymentMethod === method &&
+                        styles.paymentTabTextActive,
+                    ]}
+                  >
+                    {method === 'card'
+                      ? 'Credit Card'
+                      : method === 'paypal'
+                      ? 'PayPal'
+                      : 'Pay at Hotel'}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -425,7 +552,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                 />
                 <InputField
                   label="Card Number"
-                  placeholder="4532 8892 7731 2291"
+                  placeholder="4532 •••• •••• 8892"
                   value={formData.cardNumber}
                   onChangeText={(val) => handleInputChange('cardNumber', val)}
                 />
@@ -440,7 +567,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                   </View>
                   <View style={styles.halfWidth}>
                     <InputField
-                      label="CVC"
+                      label="CVC Code"
                       placeholder="882"
                       value={formData.cardCvc}
                       onChangeText={(val) => handleInputChange('cardCvc', val)}
@@ -452,31 +579,35 @@ export default function BookingScreen({ route, navigation }: Props) {
             ) : formData.paymentMethod === 'paypal' ? (
               <View style={styles.tabBox}>
                 <Text style={styles.tabBoxText}>
-                  You will be directed to PayPal to authenticate your secure transaction.
+                  You will be directed to PayPal to authenticate your transaction
+                  securely after confirming.
                 </Text>
               </View>
             ) : (
               <View style={styles.tabBox}>
                 <Text style={styles.tabBoxText}>
-                  Your reservation will be guaranteed by credit card. You can make payment at check-in.
+                  Your reservation will be guaranteed. No charge processed until
+                  check-in at property.
                 </Text>
               </View>
             )}
           </View>
 
-          {/* Price Breakdown */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Price Breakdown</Text>
+          {/* ─── Price Breakdown Summary ──────────────────────────────────── */}
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Reservation Summary</Text>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Stay Duration</Text>
-              <Text style={styles.priceVal}>{nights} Night{nights > 1 ? 's' : ''}</Text>
+              <Text style={styles.priceVal}>
+                {nights} {nights === 1 ? 'Night' : 'Nights'}
+              </Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Room Rate / Night</Text>
+              <Text style={styles.priceLabel}>Rate per Night</Text>
               <Text style={styles.priceVal}>{formatPrice(basePricePerNight)}</Text>
             </View>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Subtotal</Text>
+              <Text style={styles.priceLabel}>Room Subtotal</Text>
               <Text style={styles.priceVal}>{formatPrice(subtotal)}</Text>
             </View>
             <View style={styles.priceRow}>
@@ -485,16 +616,17 @@ export default function BookingScreen({ route, navigation }: Props) {
             </View>
             <View style={styles.divider} />
             <View style={styles.priceTotalRow}>
-              <Text style={styles.priceLabelTotal}>Total Paid</Text>
+              <Text style={styles.priceLabelTotal}>Total Amount</Text>
               <Text style={styles.priceValTotal}>{formatPrice(totalPrice)}</Text>
             </View>
           </View>
 
           <Button
-            title={`Confirm Reservation — ${formatPrice(totalPrice)}`}
+            title={`Confirm & Pay ${formatPrice(totalPrice)}`}
             onPress={handleSubmit}
             loading={submitting}
             style={styles.submitBtn}
+            size="lg"
           />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -506,27 +638,63 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   scrollContainer: {
     padding: SPACING.MD,
+    paddingBottom: SPACING.XXL + 20,
+  },
+  pageHeader: {
+    marginBottom: SPACING.MD,
+  },
+  hotelHeading: {
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
+    color: COLORS.TEXT_PRIMARY,
+    letterSpacing: -0.3,
+  },
+  hotelSubheading: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_SECONDARY,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  guaranteeText: {
+    fontSize: 11,
+    color: COLORS.PRIMARY,
+    fontWeight: '600',
+    marginTop: 6,
+  },
+  errorBox: {
+    backgroundColor: COLORS.ERROR_BG,
+    borderWidth: 1,
+    borderColor: COLORS.ERROR_BORDER,
+    borderRadius: BORDER_RADIUS.MD,
+    padding: SPACING.MD,
+    marginBottom: SPACING.MD,
+  },
+  errorBoxText: {
+    color: COLORS.ERROR,
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
     padding: SPACING.LG,
   },
   authBox: {
     backgroundColor: COLORS.WHITE,
-    borderRadius: BORDER_RADIUS.LG,
+    borderRadius: BORDER_RADIUS.XL,
     padding: SPACING.XL,
     alignItems: 'center',
     width: '100%',
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    ...SHADOWS.MD,
+    ...SHADOWS.LG,
   },
   authIcon: {
     fontSize: 48,
@@ -534,12 +702,12 @@ const styles = StyleSheet.create({
   },
   authTitle: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.SM,
   },
   authText: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     marginBottom: SPACING.LG,
@@ -551,46 +719,46 @@ const styles = StyleSheet.create({
   },
   authRegisterLinkText: {
     color: COLORS.PRIMARY,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-  },
-  hotelHeading: {
-    fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
-  },
-  hotelSubheading: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_SECONDARY,
-    marginBottom: SPACING.MD,
-  },
-  errorBox: {
-    backgroundColor: '#fff5f5',
-    borderWidth: 1,
-    borderColor: '#feb2b2',
-    borderRadius: BORDER_RADIUS.MD,
-    padding: SPACING.MD,
-    marginBottom: SPACING.MD,
-  },
-  errorBoxText: {
-    color: COLORS.ERROR,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    textAlign: 'center',
+    fontWeight: '800',
+    fontSize: FONT_SIZE.BODY_SMALL,
   },
   card: {
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.MD,
+    padding: SPACING.LG,
     marginBottom: SPACING.MD,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
     ...SHADOWS.SM,
   },
-  cardTitle: {
-    fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.MD,
     marginBottom: SPACING.MD,
+  },
+  stepBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBadgeText: {
+    color: COLORS.WHITE,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  cardTitle: {
+    fontSize: FONT_SIZE.BODY_LARGE,
+    fontWeight: '800',
+    color: COLORS.TEXT_PRIMARY,
+  },
+  cardSubtitle: {
+    fontSize: 11,
+    color: COLORS.TEXT_SECONDARY,
+    marginTop: 1,
   },
   row: {
     flexDirection: 'row',
@@ -600,9 +768,9 @@ const styles = StyleSheet.create({
     width: '48%',
   },
   inputLabel: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     fontWeight: '600',
-    color: COLORS.TEXT_PRIMARY,
+    color: COLORS.TEXT_DARK,
     marginBottom: SPACING.SM,
   },
   roomTierRow: {
@@ -612,33 +780,36 @@ const styles = StyleSheet.create({
   },
   roomTierPill: {
     width: '31%',
-    padding: SPACING.SM,
-    borderWidth: 1,
+    paddingVertical: SPACING.SM,
+    paddingHorizontal: SPACING.XS,
+    borderWidth: 1.5,
     borderColor: COLORS.BORDER,
     borderRadius: BORDER_RADIUS.MD,
     alignItems: 'center',
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   roomTierPillActive: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: COLORS.PRIMARY_SURFACE,
     borderColor: COLORS.PRIMARY,
   },
   roomTierPillText: {
     color: COLORS.TEXT_PRIMARY,
-    fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_SMALL - 1,
+    fontWeight: '700',
   },
   roomTierPillTextActive: {
-    color: COLORS.WHITE,
+    color: COLORS.PRIMARY,
+    fontWeight: '800',
   },
   roomTierPillPrice: {
     color: COLORS.TEXT_SECONDARY,
-    fontSize: FONT_SIZE.BODY_SMALL,
+    fontSize: 11,
     marginTop: 2,
+    fontWeight: '600',
   },
   paymentTabs: {
     flexDirection: 'row',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.BORDER,
     borderRadius: BORDER_RADIUS.MD,
     overflow: 'hidden',
@@ -648,15 +819,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: SPACING.MD - 4,
     alignItems: 'center',
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   paymentTabActive: {
     backgroundColor: COLORS.PRIMARY,
   },
   paymentTabText: {
     color: COLORS.TEXT_PRIMARY,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '700',
+    fontSize: 11,
   },
   paymentTabTextActive: {
     color: COLORS.WHITE,
@@ -665,54 +836,72 @@ const styles = StyleSheet.create({
     marginTop: SPACING.XS,
   },
   tabBox: {
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
     padding: SPACING.MD,
     borderRadius: BORDER_RADIUS.MD,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
   },
   tabBoxText: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
-    lineHeight: 20,
+    lineHeight: 18,
+  },
+  summaryCard: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: BORDER_RADIUS.LG,
+    padding: SPACING.LG,
+    marginBottom: SPACING.LG,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    ...SHADOWS.MD,
+  },
+  summaryTitle: {
+    fontSize: FONT_SIZE.BODY_LARGE,
+    fontWeight: '900',
+    color: COLORS.TEXT_PRIMARY,
+    marginBottom: SPACING.MD,
   },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  priceTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.SM,
+    marginBottom: 8,
   },
   priceLabel: {
     color: COLORS.TEXT_SECONDARY,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
   },
   priceVal: {
     color: COLORS.TEXT_PRIMARY,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
   },
   divider: {
     height: 1,
     backgroundColor: COLORS.BORDER,
     marginVertical: SPACING.SM,
   },
+  priceTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: SPACING.XS,
+  },
   priceLabelTotal: {
     fontSize: FONT_SIZE.BODY_LARGE,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
   },
   priceValTotal: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.PRIMARY,
   },
   submitBtn: {
     marginBottom: SPACING.XXL,
   },
-  // Confirmation Receipt styles
+
+  /* ─── Receipt View Styles ──────────────────────────────────────────────── */
   receiptContainer: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -720,86 +909,102 @@ const styles = StyleSheet.create({
   },
   receiptCard: {
     backgroundColor: COLORS.WHITE,
-    borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
+    borderRadius: BORDER_RADIUS.XL,
+    padding: SPACING.LG + 4,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    ...SHADOWS.MD,
+    ...SHADOWS.LG,
   },
   successBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#DEF7EC',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.SUCCESS_BG,
+    borderWidth: 2,
+    borderColor: COLORS.SUCCESS_BORDER,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.MD,
   },
   successIcon: {
-    fontSize: 28,
+    fontSize: 32,
     color: COLORS.SUCCESS,
-    fontWeight: 'bold',
+    fontWeight: '900',
+  },
+  receiptTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.SUCCESS,
+    letterSpacing: 1,
+    marginBottom: 4,
   },
   receiptTitle: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
-    marginBottom: SPACING.SM,
+    letterSpacing: -0.3,
+    marginBottom: 4,
   },
   receiptSubtitle: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     marginBottom: SPACING.LG,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   refBox: {
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.PRIMARY_SURFACE,
     paddingVertical: SPACING.MD,
-    paddingHorizontal: SPACING.XL,
+    paddingHorizontal: SPACING.LG,
     borderRadius: BORDER_RADIUS.MD,
     borderWidth: 1,
-    borderColor: COLORS.BORDER,
+    borderColor: COLORS.PRIMARY_TINT,
     alignItems: 'center',
     width: '100%',
     marginBottom: SPACING.LG,
   },
   refLabel: {
-    fontSize: 10,
-    color: COLORS.TEXT_SECONDARY,
-    fontWeight: 'bold',
+    fontSize: 9,
+    color: COLORS.PRIMARY,
+    fontWeight: '800',
     letterSpacing: 1,
   },
   refValue: {
-    fontSize: FONT_SIZE.H1,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
     color: COLORS.PRIMARY,
-    marginTop: 4,
+    marginTop: 3,
+    letterSpacing: 0.5,
   },
   receiptGrid: {
     width: '100%',
-    marginBottom: SPACING.XL,
+    marginBottom: SPACING.LG,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.BORDER,
   },
   receiptRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: SPACING.SM,
+    paddingVertical: SPACING.SM + 2,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BG_SECONDARY,
   },
   receiptLabel: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
   },
   receiptVal: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    fontWeight: '600',
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '700',
     color: COLORS.TEXT_PRIMARY,
+    maxWidth: '60%',
+    textAlign: 'right',
   },
   receiptValHighlight: {
     color: COLORS.PRIMARY,
-    fontWeight: 'bold',
+    fontWeight: '900',
+    fontSize: FONT_SIZE.BODY_LARGE,
   },
   capitalize: {
     textTransform: 'capitalize',

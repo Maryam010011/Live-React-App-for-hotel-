@@ -1,7 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, Modal, SafeAreaView, Alert } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation/AppNavigator';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  SafeAreaView,
+  Image,
+  TouchableOpacity,
+  Modal,
+  StatusBar,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { fetchHotels, deleteHotel } from '../api/hotelApi';
 import { Hotel } from '../types/hotel';
 import { COLORS } from '../constants/colors';
@@ -10,191 +19,210 @@ import { formatPrice } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
+import InputField from '../components/InputField';
 import Button from '../components/Button';
-
-type Props = NativeStackScreenProps<RootStackParamList, 'MainTabs'>;
 
 export default function AdminHotelListScreen({ navigation }: any) {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // Deletion modal state
-  const [deletingId, setDeletingId] = useState<number | string | null>(null);
-  const [deletingName, setDeletingName] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  const loadHotels = async () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<Hotel | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const loadHotels = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
       const data = await fetchHotels();
       setHotels(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load hotel catalog.');
+      setError(err.message || 'Failed to retrieve hotel listings.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    // Reload whenever screen is focused
-    const unsubscribe = navigation.addListener('focus', () => {
+  useFocusEffect(
+    useCallback(() => {
       loadHotels();
-    });
-    return unsubscribe;
-  }, [navigation]);
+    }, [])
+  );
 
-  const confirmDelete = (hotel: Hotel) => {
-    setDeletingId(hotel.id);
-    setDeletingName(hotel.name);
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadHotels(true);
   };
 
-  const handleDelete = async () => {
-    if (!deletingId) return;
-    setIsDeleting(true);
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await deleteHotel(deletingId);
-      setDeletingId(null);
-      Alert.alert('Success', 'Hotel deleted successfully.');
-      loadHotels();
+      await deleteHotel(deleteTarget.id);
+      setDeleteTarget(null);
+      loadHotels(true);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not delete hotel listing.');
+      alert(err.message || 'Could not delete property.');
     } finally {
-      setIsDeleting(false);
+      setDeleting(false);
     }
   };
 
   const filteredHotels = hotels.filter(
     (h) =>
-      h.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      h.type.toLowerCase().includes(searchTerm.toLowerCase())
+      h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      h.city.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderHotelRow = ({ item }: { item: Hotel }) => (
-    <View style={styles.hotelRow}>
-      <Image source={{ uri: item.image }} style={styles.thumb} />
-      <View style={styles.details}>
-        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={styles.location}>📍 {item.city}, {item.country}</Text>
-        <View style={styles.metaRow}>
-          <Text style={styles.price}>{formatPrice(item.price)}</Text>
-          <Text style={styles.rating}>⭐ {item.rating}</Text>
-          <Text style={styles.type}>{item.type}</Text>
+  const renderItem = useCallback(
+    ({ item }: { item: Hotel }) => (
+      <View style={styles.hotelRowCard}>
+        <Image
+          source={{ uri: item.image }}
+          style={styles.thumb}
+          resizeMode="cover"
+        />
+
+        <View style={styles.infoCol}>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>
+                {item.type.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.location} numberOfLines={1}>
+            📍 {item.city}, {item.country}
+          </Text>
+
+          <View style={styles.metaRow}>
+            <Text style={styles.price}>{formatPrice(item.price)}/nt</Text>
+            <Text style={styles.rating}>⭐ {item.rating.toFixed(1)}</Text>
+            <Text style={styles.rooms}>{item.rooms} rooms</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionsCol}>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() =>
+              navigation.navigate('AdminHotelForm', { id: item.id })
+            }
+          >
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => setDeleteTarget(item)}
+          >
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
         </View>
       </View>
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.editBtn}
-          onPress={() => navigation.navigate('AdminHotelForm', { id: item.id })}
-        >
-          <Text style={styles.actionText}>✏️</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => confirmDelete(item)}
-        >
-          <Text style={styles.actionText}>🗑️</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    ),
+    [navigation]
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Top Banner Toolbar */}
-      <View style={styles.topToolbar}>
-        <View>
-          <Text style={styles.toolbarTitle}>Hotel Catalog</Text>
-          <Text style={styles.toolbarSub}>Manage property inventories</Text>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.NAVY_DARK} />
+      {/* Admin Top Header Banner */}
+      <View style={styles.topHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTag}>ADMINISTRATION</Text>
+          <Text style={styles.headerTitle}>Hotel Directory</Text>
+          <Text style={styles.headerSubtitle}>
+            Manage hotel properties, pricing, and availability
+          </Text>
         </View>
         <TouchableOpacity
-          style={styles.createBtn}
-          onPress={() => navigation.navigate('AdminHotelForm')}
+          style={styles.addBtn}
+          onPress={() => navigation.navigate('AdminHotelForm', {})}
+          activeOpacity={0.88}
         >
-          <Text style={styles.createBtnText}>+ Add New</Text>
+          <Text style={styles.addBtnText}>+ Add Property</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Admin Quick Options */}
-      <View style={styles.adminQuickOptions}>
-        <Button
-          title="View All System Bookings 📋"
-          variant="outline"
-          onPress={() => navigation.navigate('AdminBookings')}
-          style={styles.sysBookingsBtn}
+      <View style={styles.searchSection}>
+        <InputField
+          label=""
+          placeholder="Filter by hotel name or city..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          leftIcon={<Text>🔍</Text>}
         />
-      </View>
-
-      {/* Search Filter */}
-      <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by hotel, city, type..."
-          placeholderTextColor={COLORS.TEXT_LIGHT}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-        />
-        {searchTerm ? (
-          <TouchableOpacity onPress={() => setSearchTerm('')}>
-            <Text style={styles.clearSearch}>✕</Text>
-          </TouchableOpacity>
-        ) : null}
       </View>
 
       {loading ? (
-        <LoadingSpinner message="Retrieving catalog..." fullScreen />
+        <LoadingSpinner message="Loading catalog..." fullScreen />
       ) : error ? (
-        <ErrorMessage message={error} onRetry={loadHotels} />
+        <ErrorMessage message={error} onRetry={() => loadHotels()} />
       ) : (
         <FlatList
           data={filteredHotels}
-          renderItem={renderHotelRow}
+          renderItem={renderItem}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={styles.list}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={styles.counterRow}>
+              <Text style={styles.counterText}>
+                Catalog contains{' '}
+                <Text style={{ fontWeight: '800', color: COLORS.PRIMARY }}>
+                  {filteredHotels.length}
+                </Text>{' '}
+                properties
+              </Text>
+            </View>
+          }
           ListEmptyComponent={
             <EmptyState
-              message="No properties listed yet"
-              suggestion={searchTerm ? 'Try checking your search spelling' : 'Tap Add New to register a property'}
+              message="No Hotels Found"
+              suggestion="No properties match your filter criteria."
+              icon="🏢"
             />
           }
         />
       )}
 
       {/* Delete Confirmation Modal */}
-      <Modal
-        visible={deletingId !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeletingId(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+      <Modal visible={!!deleteTarget} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
             <Text style={styles.modalIcon}>⚠️</Text>
-            <Text style={styles.modalTitle}>Confirm Deletion</Text>
+            <Text style={styles.modalTitle}>Confirm Property Removal</Text>
             <Text style={styles.modalText}>
-              Are you sure you want to remove <Text style={{ fontWeight: 'bold' }}>"{deletingName}"</Text>? This will permanently delete it from MongoDB database.
+              Are you sure you want to delete{' '}
+              <Text style={{ fontWeight: '800', color: COLORS.TEXT_PRIMARY }}>
+                "{deleteTarget?.name}"
+              </Text>
+              ? This action cannot be undone.
             </Text>
+
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnCancel]}
-                onPress={() => setDeletingId(null)}
-                disabled={isDeleting}
-              >
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtn, styles.modalBtnDelete]}
-                onPress={handleDelete}
-                disabled={isDeleting}
-              >
-                <Text style={styles.modalBtnDeleteText}>
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </Text>
-              </TouchableOpacity>
+              <Button
+                title="Cancel"
+                variant="outline"
+                onPress={() => setDeleteTarget(null)}
+                style={styles.modalBtn}
+              />
+              <Button
+                title="Delete Property"
+                variant="danger"
+                onPress={handleConfirmDelete}
+                loading={deleting}
+                style={styles.modalBtn}
+              />
             </View>
           </View>
         </View>
@@ -206,152 +234,174 @@ export default function AdminHotelListScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
-  topToolbar: {
+  topHeader: {
+    backgroundColor: COLORS.NAVY_DARK,
+    paddingVertical: SPACING.LG,
+    paddingHorizontal: SPACING.MD,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.PRIMARY,
-    padding: SPACING.MD,
+    gap: SPACING.MD,
+    ...SHADOWS.MD,
   },
-  toolbarTitle: {
+  headerTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.SECONDARY_GOLD,
+    letterSpacing: 1.2,
+  },
+  headerTitle: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.WHITE,
+    letterSpacing: -0.3,
   },
-  toolbarSub: {
+  headerSubtitle: {
     fontSize: FONT_SIZE.BODY_SMALL,
-    color: COLORS.SECONDARY_LIGHT,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 2,
   },
-  createBtn: {
-    backgroundColor: COLORS.SECONDARY,
-    paddingVertical: SPACING.SM - 2,
+  addBtn: {
+    backgroundColor: COLORS.PRIMARY,
+    paddingVertical: SPACING.SM + 2,
     paddingHorizontal: SPACING.MD,
     borderRadius: BORDER_RADIUS.MD,
-    ...SHADOWS.SM,
+    ...SHADOWS.PRIMARY_GLOW,
   },
-  createBtnText: {
+  addBtnText: {
     color: COLORS.WHITE,
-    fontWeight: 'bold',
+    fontWeight: '800',
     fontSize: FONT_SIZE.BODY_SMALL,
   },
-  adminQuickOptions: {
+  searchSection: {
     paddingHorizontal: SPACING.MD,
     paddingTop: SPACING.MD,
   },
-  sysBookingsBtn: {
-    marginVertical: 0,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.WHITE,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    borderRadius: BORDER_RADIUS.MD,
-    margin: SPACING.MD,
-    paddingHorizontal: SPACING.MD,
-    height: 44,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_PRIMARY,
-  },
-  clearSearch: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    color: COLORS.TEXT_LIGHT,
-    paddingHorizontal: 5,
-  },
-  listContainer: {
-    padding: SPACING.MD,
-  },
-  hotelRow: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.WHITE,
-    borderRadius: BORDER_RADIUS.MD,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
+  counterRow: {
     marginBottom: SPACING.SM,
-    padding: SPACING.SM,
+  },
+  counterText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_SECONDARY,
+  },
+  list: {
+    paddingHorizontal: SPACING.MD,
+    paddingBottom: SPACING.XXL,
+  },
+  hotelRowCard: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: BORDER_RADIUS.LG,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    padding: SPACING.SM + 2,
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: SPACING.MD - 2,
+    gap: SPACING.MD,
     ...SHADOWS.SM,
   },
   thumb: {
-    width: 60,
-    height: 60,
-    borderRadius: BORDER_RADIUS.SM,
+    width: 72,
+    height: 72,
+    borderRadius: BORDER_RADIUS.MD,
     backgroundColor: COLORS.BG_SECONDARY,
   },
-  details: {
+  infoCol: {
     flex: 1,
-    marginLeft: SPACING.SM,
-    justifyContent: 'center',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
   },
   name: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontWeight: '800',
     color: COLORS.TEXT_PRIMARY,
+    flex: 1,
+    marginRight: 4,
+  },
+  typeBadge: {
+    backgroundColor: COLORS.PRIMARY_SURFACE,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY_TINT,
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: BORDER_RADIUS.SM,
+  },
+  typeBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.PRIMARY,
   },
   location: {
-    fontSize: FONT_SIZE.BODY_SMALL,
+    fontSize: 11,
     color: COLORS.TEXT_SECONDARY,
-    marginTop: 2,
+    marginBottom: 4,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: SPACING.SM,
   },
   price: {
-    fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '900',
     color: COLORS.PRIMARY,
-    marginRight: SPACING.SM,
   },
   rating: {
-    fontSize: FONT_SIZE.BODY_SMALL - 1,
-    color: COLORS.TEXT_SECONDARY,
-    marginRight: SPACING.SM,
-  },
-  type: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    backgroundColor: COLORS.BG_SECONDARY,
+    fontSize: 11,
+    fontWeight: '700',
     color: COLORS.SECONDARY,
-    paddingVertical: 1,
-    paddingHorizontal: 4,
-    borderRadius: 3,
-    borderWidth: 0.5,
-    borderColor: COLORS.BORDER,
   },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  rooms: {
+    fontSize: 11,
+    color: COLORS.TEXT_MUTED,
+  },
+  actionsCol: {
+    gap: 6,
   },
   editBtn: {
-    padding: SPACING.SM,
+    backgroundColor: COLORS.PRIMARY,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: BORDER_RADIUS.SM,
+  },
+  editBtnText: {
+    color: COLORS.WHITE,
+    fontSize: 11,
+    fontWeight: '700',
   },
   deleteBtn: {
-    padding: SPACING.SM,
+    backgroundColor: COLORS.ERROR_BG,
+    borderWidth: 1,
+    borderColor: COLORS.ERROR_BORDER,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: BORDER_RADIUS.SM,
   },
-  actionText: {
-    fontSize: 18,
+  deleteBtnText: {
+    color: COLORS.ERROR,
+    fontSize: 11,
+    fontWeight: '700',
   },
-  modalOverlay: {
+  modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.LG,
   },
-  modalCard: {
+  modalContent: {
     backgroundColor: COLORS.WHITE,
-    borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.LG,
-    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.XL,
+    padding: SPACING.XL,
     width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
     ...SHADOWS.LG,
   },
   modalIcon: {
@@ -360,44 +410,23 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.SM,
   },
   modalText: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     marginBottom: SPACING.LG,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: SPACING.MD,
     width: '100%',
   },
   modalBtn: {
     flex: 1,
-    paddingVertical: SPACING.MD - 4,
-    borderRadius: BORDER_RADIUS.MD,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: SPACING.XS,
-  },
-  modalBtnCancel: {
-    backgroundColor: COLORS.BG_SECONDARY,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-  },
-  modalBtnCancelText: {
-    color: COLORS.TEXT_PRIMARY,
-    fontWeight: 'bold',
-  },
-  modalBtnDelete: {
-    backgroundColor: COLORS.ERROR,
-  },
-  modalBtnDeleteText: {
-    color: COLORS.WHITE,
-    fontWeight: 'bold',
   },
 });

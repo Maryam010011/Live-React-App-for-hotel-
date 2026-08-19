@@ -1,393 +1,407 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, Image, TextInput, Alert, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  SafeAreaView,
+  Image,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  StatusBar,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { fetchHotelById, createHotel, updateHotel } from '../api/hotelApi';
-import { CLOUDINARY_CONFIG } from '../constants/api';
 import { Hotel } from '../types/hotel';
-import { validateName } from '../utils/validation';
 import { COLORS } from '../constants/colors';
+import { CLOUDINARY_CONFIG } from '../constants/api';
 import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 import InputField from '../components/InputField';
 import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
-import ErrorMessage from '../components/ErrorMessage';
-import * as ImagePicker from 'expo-image-picker';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdminHotelForm'>;
 
-type FormFields = 'name' | 'city' | 'country' | 'address' | 'description' | 'image' | 'price';
-
 export default function AdminHotelFormScreen({ route, navigation }: Props) {
-  const hotelId = route.params?.id;
-  const isEditMode = Boolean(hotelId);
+  const { id } = route.params || {};
+  const isEditing = Boolean(id);
 
-  const [loading, setLoading] = useState(isEditMode);
+  const [loading, setLoading] = useState(isEditing);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<Partial<Hotel>>({
+  const [formData, setFormData] = useState({
     name: '',
     city: '',
     country: '',
     address: '',
-    price: 150,
-    rating: 4.5,
     description: '',
-    image: '',
-    amenities: ['WiFi', 'Air Conditioning', 'Room Service'],
-    rooms: 50,
-    type: 'Luxury',
+    price: '',
+    rating: '4.8',
+    rooms: '50',
+    type: 'Resort',
+    image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80',
+    amenitiesStr: 'Free WiFi, Swimming Pool, Spa & Wellness, Fine Dining, Ocean View',
   });
 
-  const [amenityInput, setAmenityInput] = useState('');
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FormFields, string | null>>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
 
-  // Load hotel details if in edit mode
   useEffect(() => {
-    if (isEditMode && hotelId) {
-      const loadHotelData = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          const data = await fetchHotelById(hotelId);
-          if (data) {
-            setFormData(data);
-          } else {
-            setError('Hotel listing not found.');
-          }
-        } catch (err: any) {
-          setError(err.message || 'Failed to load hotel.');
-        } finally {
-          setLoading(false);
-        }
-      };
-      loadHotelData();
+    if (isEditing && id) {
+      loadHotelData(id);
     }
-  }, [hotelId, isEditMode]);
+  }, [id, isEditing]);
 
-  const validateField = (field: FormFields, value: any): string | null => {
-    const strVal = String(value || '').trim();
-    switch (field) {
-      case 'name':
-        return validateName(strVal, 'Hotel name');
-      case 'city':
-        return validateName(strVal, 'City');
-      case 'country':
-        return validateName(strVal, 'Country');
-      case 'address':
-        if (!strVal) return 'Address is required.';
-        if (strVal.length < 5) return 'Address must be at least 5 characters.';
-        return null;
-      case 'description':
-        if (!strVal) return 'Description is required.';
-        if (strVal.length < 10) return 'Description must be at least 10 characters.';
-        return null;
-      case 'image':
-        if (!strVal) return 'Image is required. Please upload or paste a link.';
-        return null;
-      case 'price':
-        if (value === undefined || value === null || isNaN(Number(value)) || Number(value) <= 0) {
-          return 'Please enter a valid positive price.';
-        }
-        return null;
-      default:
-        return null;
+  const loadHotelData = async (hotelId: string | number) => {
+    setLoading(true);
+    try {
+      const data = await fetchHotelById(hotelId);
+      if (data) {
+        setFormData({
+          name: data.name,
+          city: data.city,
+          country: data.country,
+          address: data.address || '',
+          description: data.description,
+          price: String(data.price),
+          rating: String(data.rating),
+          rooms: String(data.rooms),
+          type: data.type,
+          image: data.image,
+          amenitiesStr: data.amenities ? data.amenities.join(', ') : '',
+        });
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load property details.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleInputChange = (field: keyof Hotel, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setFieldErrors((prev) => ({ ...prev, [field as FormFields]: null }));
-  };
-
-  // Image upload handling
   const handlePickImage = async () => {
-    const permissions = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissions.granted) {
-      Alert.alert('Permission Denied', 'Permission to access media library is required to select property images.');
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Camera roll permission is required to upload property photos.');
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
+      aspect: [16, 9],
       quality: 0.8,
     });
 
-    if (!result.canceled && result.assets[0]?.uri) {
-      await uploadToCloudinary(result.assets[0].uri);
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const selectedUri = result.assets[0].uri;
+      uploadToCloudinary(selectedUri);
     }
   };
 
-  const uploadToCloudinary = async (localUri: string) => {
+  const uploadToCloudinary = async (imageUri: string) => {
     setUploadingImage(true);
+    setError(null);
+
     try {
-      const uploadUrl = CLOUDINARY_CONFIG.UPLOAD_URL;
-      const uploadPreset = CLOUDINARY_CONFIG.UPLOAD_PRESET;
+      const uploadData = new FormData();
+      const filename = imageUri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      const data = new FormData();
-      const uriParts = localUri.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      data.append('file', {
-        uri: localUri,
-        name: `hotel_photo.${fileType}`,
-        type: `image/${fileType}`,
+      uploadData.append('file', {
+        uri: imageUri,
+        name: filename,
+        type: type,
       } as any);
-      data.append('upload_preset', uploadPreset);
 
-      const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: data,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      uploadData.append('upload_preset', CLOUDINARY_CONFIG.UPLOAD_PRESET);
 
-      const resJson = await response.json();
-      if (resJson.secure_url) {
-        handleInputChange('image', resJson.secure_url);
-        Alert.alert('Success', 'Image uploaded successfully to Cloudinary!');
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.CLOUD_NAME}/image/upload`,
+        {
+          method: 'POST',
+          body: uploadData,
+        }
+      );
+
+      const json = await response.json();
+      if (json.secure_url) {
+        setFormData((prev) => ({ ...prev, image: json.secure_url }));
       } else {
-        throw new Error(resJson.error?.message || 'Failed to retrieve Cloudinary secure URL');
+        throw new Error(json.error?.message || 'Cloudinary upload failed.');
       }
     } catch (err: any) {
-      console.error('Image upload failed:', err);
-      Alert.alert('Upload Failed', err.message || 'Could not upload image.');
+      setError('Image upload failed: ' + err.message);
     } finally {
       setUploadingImage(false);
     }
   };
 
-  const handleAddAmenity = () => {
-    const trimmed = amenityInput.trim();
-    if (!trimmed) return;
-    const current = formData.amenities || [];
-    if (!current.includes(trimmed)) {
-      handleInputChange('amenities', [...current, trimmed]);
-    }
-    setAmenityInput('');
-  };
-
-  const handleRemoveAmenity = (item: string) => {
-    const current = formData.amenities || [];
-    handleInputChange('amenities', current.filter((a) => a !== item));
-  };
-
-  const handleSave = async () => {
-    // Validate all fields
-    const nameErr = validateField('name', formData.name);
-    const cityErr = validateField('city', formData.city);
-    const countryErr = validateField('country', formData.country);
-    const addressErr = validateField('address', formData.address);
-    const descErr = validateField('description', formData.description);
-    const imgErr = validateField('image', formData.image);
-    const priceErr = validateField('price', formData.price);
-
-    const errors = {
-      name: nameErr,
-      city: cityErr,
-      country: countryErr,
-      address: addressErr,
-      description: descErr,
-      image: imgErr,
-      price: priceErr,
-    };
+  const handleSubmit = async () => {
+    const errors: Record<string, string | null> = {};
+    if (!formData.name.trim()) errors.name = 'Hotel name is required';
+    if (!formData.city.trim()) errors.city = 'City is required';
+    if (!formData.country.trim()) errors.country = 'Country is required';
+    if (!formData.price.trim() || isNaN(Number(formData.price)))
+      errors.price = 'Valid numeric price required';
 
     setFieldErrors(errors);
-
-    if (nameErr || cityErr || countryErr || addressErr || descErr || imgErr || priceErr) {
-      Alert.alert('Validation Error', 'Please correct the errors in the form before submitting.');
-      return;
-    }
+    if (Object.values(errors).some(Boolean)) return;
 
     setSubmitting(true);
     setError(null);
 
+    const payload: Partial<Hotel> = {
+      name: formData.name.trim(),
+      city: formData.city.trim(),
+      country: formData.country.trim(),
+      address: formData.address.trim() || `${formData.city}, ${formData.country}`,
+      description: formData.description.trim(),
+      price: Number(formData.price),
+      rating: Number(formData.rating) || 4.5,
+      rooms: Number(formData.rooms) || 10,
+      type: formData.type,
+      image: formData.image,
+      amenities: formData.amenitiesStr
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean),
+    };
+
     try {
-      if (isEditMode && hotelId) {
-        await updateHotel(hotelId, formData);
-        Alert.alert('Success', 'Hotel listing updated successfully.');
+      if (isEditing && id) {
+        await updateHotel(id, payload);
       } else {
-        await createHotel(formData);
-        Alert.alert('Success', 'Hotel listing created successfully.');
+        await createHotel(payload);
       }
       navigation.goBack();
     } catch (err: any) {
-      setError(err.message || 'Failed to save hotel listing details.');
+      setError(err.message || 'Failed to save property listing.');
     } finally {
       setSubmitting(false);
     }
   };
 
   if (loading) {
-    return <LoadingSpinner message="Retrieving property data..." fullScreen />;
+    return <LoadingSpinner message="Loading property specifications..." fullScreen />;
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-        {error ? (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorText}>{error}</Text>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.NAVY_DARK} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTag}>
+              {isEditing ? 'UPDATE LISTING' : 'NEW LISTING'}
+            </Text>
+            <Text style={styles.headerTitle}>
+              {isEditing ? 'Edit Property Details' : 'Add New Property'}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              Provide complete hotel specifications, high-res photos, and rates
+            </Text>
           </View>
-        ) : null}
 
-        {/* Section 1: Property Image */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Property Image</Text>
-          {formData.image ? (
-            <View style={styles.imagePreviewContainer}>
-              <Image source={{ uri: formData.image }} style={styles.previewImage} resizeMode="cover" />
-              <TouchableOpacity
-                style={styles.removeImageBadge}
-                onPress={() => handleInputChange('image', '')}
-              >
-                <Text style={styles.removeImageText}>Remove Image ✕</Text>
-              </TouchableOpacity>
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
             </View>
-          ) : (
-            <TouchableOpacity style={styles.uploadBox} onPress={handlePickImage} disabled={uploadingImage}>
-              {uploadingImage ? (
-                <View style={styles.loadingBox}>
-                  <ActivityIndicator size="small" color={COLORS.PRIMARY} />
-                  <Text style={styles.uploadTextSub}>Uploading to Cloudinary CDN...</Text>
-                </View>
-              ) : (
-                <View style={{ alignItems: 'center' }}>
-                  <Text style={styles.uploadIcon}>📷</Text>
-                  <Text style={styles.uploadTextPrimary}>Upload Property Image</Text>
-                  <Text style={styles.uploadTextSub}>Supports PNG, JPG, WEBP formats</Text>
+          ) : null}
+
+          {/* Image Uploader Card */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Property Photography</Text>
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: formData.image }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              {uploadingImage && (
+                <View style={styles.uploadOverlay}>
+                  <ActivityIndicator size="large" color={COLORS.WHITE} />
+                  <Text style={styles.uploadingText}>
+                    Uploading to Cloudinary...
+                  </Text>
                 </View>
               )}
-            </TouchableOpacity>
-          )}
-          {fieldErrors.image ? <Text style={styles.fieldError}>{fieldErrors.image}</Text> : null}
-        </View>
+            </View>
 
-        {/* Section 2: Property Description */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Property Description</Text>
-          
-          <InputField
-            label="Property Name *"
-            placeholder="e.g. Luxe Resort"
-            value={formData.name}
-            onChangeText={(val) => handleInputChange('name', val)}
-            error={fieldErrors.name}
-          />
-
-          <InputField
-            label="City *"
-            placeholder="e.g. Miami"
-            value={formData.city}
-            onChangeText={(val) => handleInputChange('city', val)}
-            error={fieldErrors.city}
-          />
-
-          <InputField
-            label="Country *"
-            placeholder="e.g. USA"
-            value={formData.country}
-            onChangeText={(val) => handleInputChange('country', val)}
-            error={fieldErrors.country}
-          />
-
-          <InputField
-            label="Address *"
-            placeholder="e.g. 100 Main St"
-            value={formData.address}
-            onChangeText={(val) => handleInputChange('address', val)}
-            error={fieldErrors.address}
-          />
-
-          <InputField
-            label="Description *"
-            placeholder="Introduce details of the hotel rooms, locations..."
-            value={formData.description}
-            onChangeText={(val) => handleInputChange('description', val)}
-            error={fieldErrors.description}
-            multiline
-            numberOfLines={4}
-          />
-        </View>
-
-        {/* Section 3: Room configurations */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Rates & Specifications</Text>
-          
-          <InputField
-            label="Price / Night ($) *"
-            placeholder="150"
-            value={String(formData.price || '')}
-            onChangeText={(val) => handleInputChange('price', val ? Number(val) : 0)}
-            error={fieldErrors.price}
-            keyboardType="numeric"
-          />
-
-          <InputField
-            label="Number of Rooms"
-            placeholder="50"
-            value={String(formData.rooms || '')}
-            onChangeText={(val) => handleInputChange('rooms', val ? Number(val) : 0)}
-            keyboardType="numeric"
-          />
-
-          <InputField
-            label="Property Type"
-            placeholder="e.g. Resort, Boutique, Business"
-            value={formData.type}
-            onChangeText={(val) => handleInputChange('type', val)}
-          />
-
-          <InputField
-            label="Default Rating (0-5)"
-            placeholder="4.5"
-            value={String(formData.rating || '')}
-            onChangeText={(val) => handleInputChange('rating', val ? Number(val) : 4.5)}
-            keyboardType="numeric"
-          />
-        </View>
-
-        {/* Section 4: Amenities */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Amenities</Text>
-          <View style={styles.amenityAddRow}>
-            <TextInput
-              style={styles.amenityInput}
-              placeholder="e.g. Free WiFi"
-              placeholderTextColor={COLORS.TEXT_LIGHT}
-              value={amenityInput}
-              onChangeText={setAmenityInput}
+            <Button
+              title="📷 Choose Photo from Library"
+              variant="outline"
+              onPress={handlePickImage}
+              loading={uploadingImage}
+              style={styles.uploadBtn}
             />
-            <TouchableOpacity style={styles.addAmenityBtn} onPress={handleAddAmenity}>
-              <Text style={styles.addAmenityBtnText}>Add</Text>
-            </TouchableOpacity>
+
+            <InputField
+              label="Or Direct Image URL"
+              placeholder="https://..."
+              value={formData.image}
+              onChangeText={(val) =>
+                setFormData((prev) => ({ ...prev, image: val }))
+              }
+            />
           </View>
 
-          <View style={styles.amenitiesBadgesContainer}>
-            {(formData.amenities || []).map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={styles.amenityBadge}
-                onPress={() => handleRemoveAmenity(item)}
-              >
-                <Text style={styles.amenityBadgeText}>{item} ✕</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+          {/* Basic Info */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Basic Information</Text>
 
-        <Button
-          title={isEditMode ? 'Update Hotel Catalog' : 'Publish Property Listing'}
-          onPress={handleSave}
-          loading={submitting}
-          style={styles.submitBtn}
-        />
-      </ScrollView>
+            <InputField
+              label="Property Name *"
+              placeholder="e.g. The Grand Palace Resort"
+              value={formData.name}
+              onChangeText={(val) =>
+                setFormData((prev) => ({ ...prev, name: val }))
+              }
+              error={fieldErrors.name}
+            />
+
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <InputField
+                  label="City *"
+                  placeholder="Dubai"
+                  value={formData.city}
+                  onChangeText={(val) =>
+                    setFormData((prev) => ({ ...prev, city: val }))
+                  }
+                  error={fieldErrors.city}
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <InputField
+                  label="Country *"
+                  placeholder="UAE"
+                  value={formData.country}
+                  onChangeText={(val) =>
+                    setFormData((prev) => ({ ...prev, country: val }))
+                  }
+                  error={fieldErrors.country}
+                />
+              </View>
+            </View>
+
+            <InputField
+              label="Street Address"
+              placeholder="123 Luxury Blvd, Marina District"
+              value={formData.address}
+              onChangeText={(val) =>
+                setFormData((prev) => ({ ...prev, address: val }))
+              }
+            />
+
+            <InputField
+              label="Property Overview & Description"
+              placeholder="Describe the hotel atmosphere, views, and luxury features..."
+              value={formData.description}
+              onChangeText={(val) =>
+                setFormData((prev) => ({ ...prev, description: val }))
+              }
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          {/* Rates and Specs */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Rates & Specifications</Text>
+
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <InputField
+                  label="Base Price ($/nt) *"
+                  placeholder="250"
+                  value={formData.price}
+                  onChangeText={(val) =>
+                    setFormData((prev) => ({ ...prev, price: val }))
+                  }
+                  error={fieldErrors.price}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <InputField
+                  label="Total Rooms"
+                  placeholder="50"
+                  value={formData.rooms}
+                  onChangeText={(val) =>
+                    setFormData((prev) => ({ ...prev, rooms: val }))
+                  }
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            <View style={styles.row}>
+              <View style={styles.halfWidth}>
+                <InputField
+                  label="Initial Rating"
+                  placeholder="4.8"
+                  value={formData.rating}
+                  onChangeText={(val) =>
+                    setFormData((prev) => ({ ...prev, rating: val }))
+                  }
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <InputField
+                  label="Category Type"
+                  placeholder="Resort, Luxury, Boutique"
+                  value={formData.type}
+                  onChangeText={(val) =>
+                    setFormData((prev) => ({ ...prev, type: val }))
+                  }
+                />
+              </View>
+            </View>
+
+            <InputField
+              label="Amenities (comma-separated)"
+              placeholder="Free WiFi, Swimming Pool, Spa, Ocean View..."
+              value={formData.amenitiesStr}
+              onChangeText={(val) =>
+                setFormData((prev) => ({ ...prev, amenitiesStr: val }))
+              }
+              multiline
+              numberOfLines={2}
+            />
+          </View>
+
+          {/* Actions */}
+          <Button
+            title={isEditing ? 'Save Property Changes' : 'Publish New Property'}
+            onPress={handleSubmit}
+            loading={submitting}
+            size="lg"
+            style={styles.submitBtn}
+          />
+
+          <Button
+            title="Cancel"
+            variant="outline"
+            onPress={() => navigation.goBack()}
+            style={styles.cancelBtn}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -395,144 +409,105 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
-  scrollContainer: {
+  scroll: {
     padding: SPACING.MD,
-    paddingBottom: SPACING.XXL,
+    paddingBottom: SPACING.XXL + 20,
   },
-  errorBanner: {
-    backgroundColor: '#fff5f5',
+  header: {
+    backgroundColor: COLORS.NAVY_DARK,
+    padding: SPACING.LG,
+    borderRadius: BORDER_RADIUS.LG,
+    marginBottom: SPACING.MD,
+    ...SHADOWS.MD,
+  },
+  headerTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.SECONDARY_GOLD,
+    letterSpacing: 1,
+  },
+  headerTitle: {
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
+    color: COLORS.WHITE,
+    marginTop: 2,
+  },
+  headerSubtitle: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_MUTED,
+    marginTop: 2,
+  },
+  errorBox: {
+    backgroundColor: COLORS.ERROR_BG,
     borderWidth: 1,
-    borderColor: '#feb2b2',
+    borderColor: COLORS.ERROR_BORDER,
     borderRadius: BORDER_RADIUS.MD,
     padding: SPACING.MD,
     marginBottom: SPACING.MD,
   },
   errorText: {
     color: COLORS.ERROR,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
     textAlign: 'center',
   },
-  sectionCard: {
+  card: {
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.LG,
-    padding: SPACING.MD,
+    padding: SPACING.LG,
+    marginBottom: SPACING.MD,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    marginBottom: SPACING.MD,
     ...SHADOWS.SM,
   },
-  sectionTitle: {
-    fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
+  cardTitle: {
+    fontSize: FONT_SIZE.BODY_LARGE,
+    fontWeight: '800',
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.MD,
   },
   imagePreviewContainer: {
     width: '100%',
     height: 180,
-    position: 'relative',
     borderRadius: BORDER_RADIUS.MD,
     overflow: 'hidden',
+    marginBottom: SPACING.MD,
+    backgroundColor: COLORS.BG_SECONDARY,
+    position: 'relative',
   },
-  previewImage: {
+  imagePreview: {
     width: '100%',
     height: '100%',
   },
-  removeImageBadge: {
-    position: 'absolute',
-    bottom: SPACING.SM,
-    right: SPACING.SM,
-    backgroundColor: 'rgba(231, 76, 60, 0.9)',
-    paddingVertical: 5,
-    paddingHorizontal: SPACING.SM,
-    borderRadius: BORDER_RADIUS.SM,
-  },
-  removeImageText: {
-    color: COLORS.WHITE,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_SMALL,
-  },
-  uploadBox: {
-    width: '100%',
-    height: 150,
-    borderWidth: 1.5,
-    borderColor: COLORS.PRIMARY,
-    borderStyle: 'dashed',
-    borderRadius: BORDER_RADIUS.MD,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.BG_SECONDARY,
-  },
-  loadingBox: {
-    alignItems: 'center',
-  },
-  uploadIcon: {
-    fontSize: 32,
-    marginBottom: SPACING.XS,
-  },
-  uploadTextPrimary: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
-  },
-  uploadTextSub: {
-    fontSize: FONT_SIZE.BODY_SMALL,
-    color: COLORS.TEXT_SECONDARY,
-    marginTop: 2,
-  },
-  fieldError: {
-    color: COLORS.ERROR,
-    fontSize: FONT_SIZE.BODY_SMALL,
-    marginTop: SPACING.XS,
-  },
-  amenityAddRow: {
-    flexDirection: 'row',
-  },
-  amenityInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    borderTopLeftRadius: BORDER_RADIUS.MD,
-    borderBottomLeftRadius: BORDER_RADIUS.MD,
-    paddingHorizontal: SPACING.MD,
-    height: 40,
-    color: COLORS.TEXT_PRIMARY,
-  },
-  addAmenityBtn: {
-    backgroundColor: COLORS.PRIMARY,
-    borderTopRightRadius: BORDER_RADIUS.MD,
-    borderBottomRightRadius: BORDER_RADIUS.MD,
-    paddingHorizontal: SPACING.LG,
+  uploadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  addAmenityBtnText: {
+  uploadingText: {
     color: COLORS.WHITE,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-  },
-  amenitiesBadgesContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: SPACING.MD,
-  },
-  amenityBadge: {
-    backgroundColor: COLORS.BG_SECONDARY,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    borderRadius: BORDER_RADIUS.SM,
-    paddingVertical: 5,
-    paddingHorizontal: SPACING.SM,
-    marginRight: SPACING.SM,
-    marginBottom: SPACING.SM,
-  },
-  amenityBadgeText: {
     fontSize: FONT_SIZE.BODY_SMALL,
-    color: COLORS.TEXT_PRIMARY,
+    fontWeight: '700',
+    marginTop: SPACING.SM,
+  },
+  uploadBtn: {
+    marginBottom: SPACING.MD,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  halfWidth: {
+    width: '48%',
   },
   submitBtn: {
-    marginVertical: SPACING.LG,
+    marginTop: SPACING.SM,
+    marginBottom: SPACING.SM,
+  },
+  cancelBtn: {
+    marginBottom: SPACING.XL,
   },
 });

@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, RefreshControl, TouchableOpacity, Alert, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  SafeAreaView,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  StatusBar,
+} from 'react-native';
 import { fetchBookings, updateBooking, deleteBooking } from '../api/bookingApi';
 import { BookingPayload } from '../types/booking';
 import { COLORS } from '../constants/colors';
@@ -8,13 +18,17 @@ import { formatDate, formatPrice } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
+import Button from '../components/Button';
 
 export default function AdminBookingsScreen() {
   const [bookings, setBookings] = useState<BookingPayload[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+
+  const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'pending' | 'cancelled'>('all');
+  const [deleteTarget, setDeleteTarget] = useState<BookingPayload | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadAllBookings = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -23,7 +37,7 @@ export default function AdminBookingsScreen() {
       const data = await fetchBookings();
       setBookings(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load system bookings.');
+      setError(err.message || 'Failed to retrieve system reservations.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -39,188 +53,253 @@ export default function AdminBookingsScreen() {
     loadAllBookings(true);
   };
 
-  const handleUpdateStatus = (bookingId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'confirmed' ? 'cancelled' : 'confirmed';
-    
-    Alert.alert(
-      'Update Reservation Status',
-      `Are you sure you want to change booking status to ${nextStatus.toUpperCase()}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Update',
-          onPress: async () => {
-            try {
-              await updateBooking(bookingId, { status: nextStatus as any });
-              Alert.alert('Success', 'Booking status updated successfully.');
-              loadAllBookings();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Could not update status.');
-            }
-          },
-        },
-      ]
-    );
-  };
+  const handleToggleStatus = async (
+    item: BookingPayload,
+    nextStatus: 'confirmed' | 'pending' | 'cancelled'
+  ) => {
+    const bookingId = item.id || item._id;
+    if (!bookingId) return;
 
-  const handleDeleteBooking = (bookingId: string, refCode: string) => {
-    Alert.alert(
-      'Confirm Deletion',
-      `Are you sure you want to permanently delete booking "${refCode}" from MongoDB?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteBooking(bookingId);
-              Alert.alert('Success', 'Booking deleted successfully.');
-              loadAllBookings();
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Could not delete booking.');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const filteredBookings = bookings.filter(
-    (b) =>
-      b.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.hotelName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const getStatusStyle = (status = 'confirmed') => {
-    switch (status.toLowerCase()) {
-      case 'cancelled':
-        return styles.statusCancelled;
-      case 'pending':
-        return styles.statusPending;
-      default:
-        return styles.statusConfirmed;
+    try {
+      await updateBooking(bookingId, { status: nextStatus });
+      setBookings((prev) =>
+        prev.map((b) =>
+          (b.id === bookingId || b._id === bookingId)
+            ? { ...b, status: nextStatus }
+            : b
+        )
+      );
+    } catch (err: any) {
+      Alert.alert('Status Update Failed', err.message || 'Could not update reservation status.');
     }
   };
 
-  const renderBookingItem = useCallback(({ item }: { item: BookingPayload }) => {
-    return (
-      <View style={styles.bookingCard}>
-        {/* Header */}
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.refText}>Ref: {item.bookingRef}</Text>
-            <Text style={styles.hotelName}>{item.hotelName}</Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.statusBadge, getStatusStyle(item.status)]}
-            onPress={() => handleUpdateStatus(item.id || item._id || '', item.status || 'confirmed')}
-          >
-            <Text style={styles.statusText}>{(item.status || 'confirmed').toUpperCase()} 🔄</Text>
-          </TouchableOpacity>
-        </View>
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    const bookingId = deleteTarget.id || deleteTarget._id;
+    if (!bookingId) return;
 
-        {/* Guest info details */}
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Guest:</Text>
-          <Text style={styles.detailVal}>{item.firstName} {item.lastName}</Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Contact:</Text>
-          <Text style={styles.detailVal}>{item.email} | {item.phone}</Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Stay Dates:</Text>
-          <Text style={styles.detailVal}>{formatDate(item.checkIn)} to {formatDate(item.checkOut)}</Text>
-        </View>
-        <View style={styles.detailsRow}>
-          <Text style={styles.detailLabel}>Room / Guests:</Text>
-          <Text style={[styles.detailVal, { textTransform: 'capitalize' }]}>
-            {item.roomType} room • {item.adults} Adults{item.children > 0 ? `, ${item.children} Children` : ''}
-          </Text>
-        </View>
-        
-        {item.specialRequests ? (
-          <View style={styles.specialRequestsBox}>
-            <Text style={styles.specialRequestsLabel}>Special Requests:</Text>
-            <Text style={styles.specialRequestsText}>"{item.specialRequests}"</Text>
-          </View>
-        ) : null}
+    setDeleting(true);
+    try {
+      await deleteBooking(bookingId);
+      setBookings((prev) => prev.filter((b) => (b.id || b._id) !== bookingId));
+      setDeleteTarget(null);
+    } catch (err: any) {
+      Alert.alert('Deletion Failed', err.message || 'Could not delete reservation.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-        {/* Footer */}
-        <View style={styles.cardFooter}>
-          <View>
-            <Text style={styles.totalLabel}>Total Price</Text>
-            <Text style={styles.totalValue}>{formatPrice(item.totalPrice)}</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDeleteBooking(item.id || item._id || '', item.bookingRef)}
-          >
-            <Text style={styles.deleteBtnText}>Delete Reservation 🗑️</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }, [bookings]);
+  const filteredBookings = bookings.filter((b) => {
+    if (statusFilter === 'all') return true;
+    return (b.status || 'confirmed').toLowerCase() === statusFilter;
+  });
 
-  const keyExtractor = useCallback((item: BookingPayload) => String(item.id || item._id || item.bookingRef), []);
+  const getStatusBadgeStyle = (status = 'confirmed') => {
+    switch (status.toLowerCase()) {
+      case 'cancelled':
+        return { bg: COLORS.ERROR_BG, border: COLORS.ERROR_BORDER, text: COLORS.ERROR };
+      case 'pending':
+        return { bg: COLORS.WARNING_BG, border: COLORS.WARNING_BORDER, text: COLORS.WARNING };
+      default:
+        return { bg: COLORS.SUCCESS_BG, border: COLORS.SUCCESS_BORDER, text: COLORS.SUCCESS };
+    }
+  };
+
+  const renderBooking = useCallback(
+    ({ item }: { item: BookingPayload }) => {
+      const currentStatus = (item.status || 'confirmed').toLowerCase();
+      const badge = getStatusBadgeStyle(currentStatus);
+
+      return (
+        <View style={styles.card}>
+          {/* Header */}
+          <View style={styles.cardHeader}>
+            <View style={{ flex: 1 }}>
+              <View style={styles.refBadge}>
+                <Text style={styles.refText}>Ref: {item.bookingRef}</Text>
+              </View>
+              <Text style={styles.hotelName}>{item.hotelName}</Text>
+            </View>
+
+            <View style={[styles.statusBadge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
+              <Text style={[styles.statusText, { color: badge.text }]}>
+                {currentStatus.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+
+          {/* Grid */}
+          <View style={styles.grid}>
+            <View style={styles.gridCol}>
+              <Text style={styles.gridLabel}>GUEST</Text>
+              <Text style={styles.gridVal}>
+                {item.firstName} {item.lastName}
+              </Text>
+            </View>
+            <View style={styles.gridCol}>
+              <Text style={styles.gridLabel}>TOTAL PAID</Text>
+              <Text style={[styles.gridVal, { color: COLORS.PRIMARY, fontWeight: '800' }]}>
+                {formatPrice(item.totalPrice)}
+              </Text>
+            </View>
+            <View style={styles.gridCol}>
+              <Text style={styles.gridLabel}>DATES</Text>
+              <Text style={styles.gridVal}>
+                {formatDate(item.checkIn)} → {formatDate(item.checkOut)}
+              </Text>
+            </View>
+            <View style={styles.gridCol}>
+              <Text style={styles.gridLabel}>ROOM</Text>
+              <Text style={[styles.gridVal, styles.capitalize]}>
+                {item.roomType} Tier
+              </Text>
+            </View>
+          </View>
+
+          {/* Contact Details */}
+          <View style={styles.contactRow}>
+            <Text style={styles.contactText}>📧 {item.email}</Text>
+            <Text style={styles.contactText}>📞 {item.phone}</Text>
+          </View>
+
+          {/* Status Changer Actions */}
+          <View style={styles.actionsFooter}>
+            <Text style={styles.actionPrompt}>Update Status:</Text>
+            <View style={styles.statusButtonGroup}>
+              {(['confirmed', 'pending', 'cancelled'] as const).map((st) => (
+                <TouchableOpacity
+                  key={st}
+                  style={[
+                    styles.statusChangeBtn,
+                    currentStatus === st && styles.statusChangeBtnActive,
+                  ]}
+                  onPress={() => handleToggleStatus(item, st)}
+                >
+                  <Text
+                    style={[
+                      styles.statusChangeBtnText,
+                      currentStatus === st && styles.statusChangeBtnTextActive,
+                    ]}
+                  >
+                    {st.charAt(0).toUpperCase() + st.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              <TouchableOpacity
+                style={styles.deleteActionBtn}
+                onPress={() => setDeleteTarget(item)}
+              >
+                <Text style={styles.deleteActionText}>🗑️</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    },
+    [bookings]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Search Input Filter */}
-      <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by ref, guest, hotel..."
-          placeholderTextColor={COLORS.TEXT_LIGHT}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-        />
-        {searchTerm ? (
-          <TouchableOpacity onPress={() => setSearchTerm('')}>
-            <Text style={styles.clearSearch}>✕</Text>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.NAVY_DARK} />
+      {/* Admin Header */}
+      <View style={styles.topHeader}>
+        <Text style={styles.headerTag}>SYSTEM ADMINISTRATION</Text>
+        <Text style={styles.headerTitle}>All Reservations</Text>
+        <Text style={styles.headerSubtitle}>
+          Live feed of customer bookings across the global platform
+        </Text>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterTabs}>
+        {(['all', 'confirmed', 'pending', 'cancelled'] as const).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, statusFilter === tab && styles.tabActive]}
+            onPress={() => setStatusFilter(tab)}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                statusFilter === tab && styles.tabTextActive,
+              ]}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </Text>
           </TouchableOpacity>
-        ) : null}
+        ))}
       </View>
 
       {loading ? (
-        <LoadingSpinner message="Retrieving all reservations..." fullScreen />
+        <LoadingSpinner message="Fetching global reservations..." fullScreen />
       ) : error ? (
         <ErrorMessage message={error} onRetry={() => loadAllBookings()} />
       ) : (
         <FlatList
           data={filteredBookings}
-          renderItem={renderBookingItem}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.listContainer}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[COLORS.PRIMARY]}
-            />
-          }
+          renderItem={renderBooking}
+          keyExtractor={(item) => String(item.id || item._id || item.bookingRef)}
+          contentContainerStyle={styles.list}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <View style={styles.header}>
-              <Text style={styles.title}>System Reservations</Text>
-              <Text style={styles.subtitle}>
-                Total {filteredBookings.length} booking documents across all guests
+            <View style={styles.counterBar}>
+              <Text style={styles.counterText}>
+                Showing{' '}
+                <Text style={{ fontWeight: '800', color: COLORS.PRIMARY }}>
+                  {filteredBookings.length}
+                </Text>{' '}
+                reservations
               </Text>
             </View>
           }
           ListEmptyComponent={
             <EmptyState
-              message="No Booking Records Found"
-              suggestion={searchTerm ? 'Try checking your search filters' : 'No reservations have been registered in the database'}
-              icon="📋"
+              message="No Bookings Found"
+              suggestion="No reservations exist matching this status filter."
+              icon="📑"
             />
           }
         />
       )}
+
+      {/* Delete Modal */}
+      <Modal visible={!!deleteTarget} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalIcon}>⚠️</Text>
+            <Text style={styles.modalTitle}>Cancel & Remove Booking</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to permanently delete reservation reference{' '}
+              <Text style={{ fontWeight: '800', color: COLORS.PRIMARY }}>
+                {deleteTarget?.bookingRef}
+              </Text>
+              ?
+            </Text>
+
+            <View style={styles.modalActions}>
+              <Button
+                title="Cancel"
+                variant="outline"
+                onPress={() => setDeleteTarget(null)}
+                style={styles.modalBtn}
+              />
+              <Button
+                title="Confirm Delete"
+                variant="danger"
+                onPress={handleConfirmDelete}
+                loading={deleting}
+                style={styles.modalBtn}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -228,54 +307,76 @@ export default function AdminBookingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.WHITE,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    borderRadius: BORDER_RADIUS.MD,
-    margin: SPACING.MD,
+  topHeader: {
+    backgroundColor: COLORS.NAVY_DARK,
+    paddingVertical: SPACING.LG,
     paddingHorizontal: SPACING.MD,
-    height: 44,
-    ...SHADOWS.SM,
+    ...SHADOWS.MD,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_PRIMARY,
+  headerTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.SECONDARY_GOLD,
+    letterSpacing: 1.2,
   },
-  clearSearch: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    color: COLORS.TEXT_LIGHT,
-    paddingHorizontal: 5,
-  },
-  listContainer: {
-    padding: SPACING.MD,
-    paddingBottom: SPACING.XL,
-  },
-  header: {
-    marginBottom: SPACING.MD,
-  },
-  title: {
+  headerTitle: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
+    fontWeight: '900',
+    color: COLORS.WHITE,
+    marginTop: 2,
+    letterSpacing: -0.3,
   },
-  subtitle: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_SECONDARY,
+  headerSubtitle: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_MUTED,
     marginTop: 2,
   },
-  bookingCard: {
+  filterTabs: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
+    paddingHorizontal: SPACING.SM,
+    paddingVertical: SPACING.XS,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: SPACING.SM,
+    alignItems: 'center',
+    borderRadius: BORDER_RADIUS.MD,
+  },
+  tabActive: {
+    backgroundColor: COLORS.PRIMARY_SURFACE,
+  },
+  tabText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
+    color: COLORS.TEXT_SECONDARY,
+  },
+  tabTextActive: {
+    color: COLORS.PRIMARY,
+    fontWeight: '800',
+  },
+  counterBar: {
+    marginBottom: SPACING.SM,
+  },
+  counterText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_SECONDARY,
+  },
+  list: {
+    padding: SPACING.MD,
+    paddingBottom: SPACING.XXL,
+  },
+  card: {
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.LG,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
+    padding: SPACING.MD + 2,
     marginBottom: SPACING.MD,
-    padding: SPACING.MD,
     ...SHADOWS.SM,
   },
   cardHeader: {
@@ -284,106 +385,159 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BG_SECONDARY,
-    paddingBottom: SPACING.SM,
-    marginBottom: SPACING.SM,
+    paddingBottom: SPACING.SM + 2,
+    marginBottom: SPACING.SM + 2,
+    gap: SPACING.SM,
+  },
+  refBadge: {
+    backgroundColor: COLORS.PRIMARY_SURFACE,
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: BORDER_RADIUS.SM,
+    alignSelf: 'flex-start',
+    marginBottom: 2,
   },
   refText: {
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 9,
+    fontWeight: '800',
     color: COLORS.PRIMARY,
-    letterSpacing: 0.5,
   },
   hotelName: {
-    fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.BODY_LARGE,
+    fontWeight: '800',
     color: COLORS.TEXT_PRIMARY,
-    marginTop: 2,
   },
   statusBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: SPACING.SM,
-    borderRadius: BORDER_RADIUS.SM,
-  },
-  statusConfirmed: {
-    backgroundColor: '#DEF7EC',
-  },
-  statusPending: {
-    backgroundColor: '#FEF3C7',
-  },
-  statusCancelled: {
-    backgroundColor: '#FDE8E8',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: BORDER_RADIUS.ROUND,
+    borderWidth: 1,
   },
   statusText: {
     fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  detailsRow: {
+  grid: {
     flexDirection: 'row',
-    marginBottom: 4,
+    flexWrap: 'wrap',
+    rowGap: SPACING.SM,
+    marginBottom: SPACING.SM + 2,
   },
-  detailLabel: {
-    width: 90,
-    fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_SECONDARY,
+  gridCol: {
+    width: '50%',
   },
-  detailVal: {
-    flex: 1,
-    fontSize: FONT_SIZE.BODY_SMALL,
-    color: COLORS.TEXT_PRIMARY,
-  },
-  specialRequestsBox: {
-    backgroundColor: COLORS.BG_SECONDARY,
-    borderWidth: 1,
-    borderColor: COLORS.BORDER,
-    padding: SPACING.SM,
-    borderRadius: BORDER_RADIUS.MD,
-    marginTop: SPACING.SM,
-    marginBottom: SPACING.SM,
-  },
-  specialRequestsLabel: {
+  gridLabel: {
     fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.5,
+    marginBottom: 1,
   },
-  specialRequestsText: {
+  gridVal: {
     fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
     color: COLORS.TEXT_PRIMARY,
-    fontStyle: 'italic',
-    marginTop: 2,
   },
-  cardFooter: {
+  capitalize: {
+    textTransform: 'capitalize',
+  },
+  contactRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    backgroundColor: COLORS.BG_PAGE,
+    padding: SPACING.SM,
+    borderRadius: BORDER_RADIUS.SM,
+    marginBottom: SPACING.SM + 2,
+  },
+  contactText: {
+    fontSize: 11,
+    color: COLORS.TEXT_SECONDARY,
+  },
+  actionsFooter: {
     borderTopWidth: 1,
     borderTopColor: COLORS.BG_SECONDARY,
     paddingTop: SPACING.SM,
-    marginTop: SPACING.SM,
   },
-  totalLabel: {
-    fontSize: 9,
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
+  actionPrompt: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    marginBottom: 4,
+    letterSpacing: 0.5,
   },
-  totalValue: {
-    fontSize: FONT_SIZE.BODY_LARGE,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+  statusButtonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  deleteBtn: {
-    backgroundColor: '#FDF2F2',
-    borderWidth: 1,
-    borderColor: '#FDE8E8',
+  statusChangeBtn: {
     paddingVertical: 5,
-    paddingHorizontal: SPACING.MD,
-    borderRadius: BORDER_RADIUS.MD,
+    paddingHorizontal: 10,
+    borderRadius: BORDER_RADIUS.SM,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    backgroundColor: COLORS.BG_PAGE,
   },
-  deleteBtnText: {
-    fontSize: FONT_SIZE.BODY_SMALL - 1,
-    fontWeight: 'bold',
-    color: COLORS.ERROR,
+  statusChangeBtnActive: {
+    backgroundColor: COLORS.NAVY_DARK,
+    borderColor: COLORS.NAVY_DARK,
+  },
+  statusChangeBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.TEXT_SECONDARY,
+  },
+  statusChangeBtnTextActive: {
+    color: COLORS.WHITE,
+    fontWeight: '700',
+  },
+  deleteActionBtn: {
+    marginLeft: 'auto',
+    padding: 6,
+  },
+  deleteActionText: {
+    fontSize: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.LG,
+  },
+  modalContent: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: BORDER_RADIUS.XL,
+    padding: SPACING.XL,
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    ...SHADOWS.LG,
+  },
+  modalIcon: {
+    fontSize: 40,
+    marginBottom: SPACING.SM,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZE.H3,
+    fontWeight: '900',
+    color: COLORS.TEXT_PRIMARY,
+    marginBottom: SPACING.SM,
+  },
+  modalText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_SECONDARY,
+    textAlign: 'center',
+    marginBottom: SPACING.LG,
+    lineHeight: 18,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: SPACING.MD,
+    width: '100%',
+  },
+  modalBtn: {
+    flex: 1,
   },
 });

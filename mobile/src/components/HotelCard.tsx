@@ -12,26 +12,57 @@ interface HotelCardProps {
 
 export const HotelCard: React.FC<HotelCardProps> = React.memo(({ hotel, onPress }) => {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.95}>
-      <Image source={{ uri: hotel.image }} style={styles.image} resizeMode="cover" />
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.92}
+    >
+      {/* Image with type badge */}
+      <View style={styles.imageWrapper}>
+        <Image
+          source={{ uri: hotel.image }}
+          style={styles.image}
+          resizeMode="cover"
+        />
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{hotel.type.toUpperCase()}</Text>
+        </View>
+      </View>
+
+      {/* Card Content */}
       <View style={styles.content}>
+        {/* Header: Title and Rating */}
         <View style={styles.headerRow}>
-          <Text style={styles.type}>{hotel.type.toUpperCase()}</Text>
-          <View style={styles.ratingContainer}>
+          <Text style={styles.name} numberOfLines={1}>
+            {hotel.name}
+          </Text>
+          <View style={styles.ratingBadge}>
             <Text style={styles.ratingText}>⭐ {hotel.rating.toFixed(1)}</Text>
           </View>
         </View>
-        <Text style={styles.name} numberOfLines={1}>
-          {hotel.name}
-        </Text>
+
+        {/* Location */}
         <Text style={styles.location}>
           📍 {hotel.city}, {hotel.country}
         </Text>
+
+        {/* Short Description */}
+        {hotel.description ? (
+          <Text style={styles.description} numberOfLines={2}>
+            {hotel.description}
+          </Text>
+        ) : null}
+
+        {/* Footer: Price & CTA */}
         <View style={styles.footerRow}>
-          <View>
-            <Text style={styles.priceLabel}>Price per night</Text>
-            <Text style={styles.price}>{formatPrice(hotel.price)}</Text>
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceLabel}>PRICE PER NIGHT</Text>
+            <View style={styles.priceValueRow}>
+              <Text style={styles.price}>{formatPrice(hotel.price)}</Text>
+              <Text style={styles.pricePeriod}>/ night</Text>
+            </View>
           </View>
+
           <View style={styles.detailsBtn}>
             <Text style={styles.detailsBtnText}>View Details →</Text>
           </View>
@@ -46,15 +77,36 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.LG,
     overflow: 'hidden',
-    marginBottom: SPACING.MD,
+    marginBottom: SPACING.MD + 4,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    ...SHADOWS.SM,
+    ...SHADOWS.MD,
+  },
+  imageWrapper: {
+    width: '100%',
+    height: 190,
+    position: 'relative',
+    backgroundColor: COLORS.BG_SECONDARY,
   },
   image: {
     width: '100%',
-    height: 180,
-    backgroundColor: COLORS.BG_SECONDARY,
+    height: '100%',
+  },
+  badge: {
+    position: 'absolute',
+    top: SPACING.SM + 2,
+    right: SPACING.SM + 2,
+    backgroundColor: COLORS.SECONDARY_GOLD,
+    paddingVertical: 4,
+    paddingHorizontal: SPACING.SM + 2,
+    borderRadius: BORDER_RADIUS.ROUND,
+    ...SHADOWS.SM,
+  },
+  badgeText: {
+    color: COLORS.WHITE,
+    fontWeight: '800',
+    fontSize: FONT_SIZE.CAPTION,
+    letterSpacing: 0.5,
   },
   content: {
     padding: SPACING.MD,
@@ -63,67 +115,89 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.XS,
+    marginBottom: 4,
+    gap: SPACING.SM,
   },
-  type: {
-    fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: 'bold',
-    color: COLORS.SECONDARY,
-    letterSpacing: 0.5,
+  name: {
+    flex: 1,
+    fontSize: FONT_SIZE.BODY_LARGE + 1,
+    fontWeight: '800',
+    color: COLORS.TEXT_PRIMARY,
+    letterSpacing: -0.2,
   },
-  ratingContainer: {
-    backgroundColor: '#fffbeb',
-    paddingHorizontal: SPACING.SM,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.ROUND,
+  ratingBadge: {
+    backgroundColor: COLORS.SECONDARY_LIGHT,
     borderWidth: 1,
-    borderColor: '#fef3c7',
+    borderColor: COLORS.SECONDARY_MUTED,
+    paddingHorizontal: SPACING.SM,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.SM,
+    alignItems: 'center',
   },
   ratingText: {
     fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: 'bold',
-    color: '#d97706',
-  },
-  name: {
-    fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_PRIMARY,
-    marginBottom: 4,
+    fontWeight: '800',
+    color: COLORS.SECONDARY,
   },
   location: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
+    marginBottom: SPACING.SM,
+    fontWeight: '500',
+  },
+  description: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    color: COLORS.TEXT_SECONDARY,
+    lineHeight: 18,
     marginBottom: SPACING.MD,
   },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-    paddingTop: SPACING.SM,
+    borderTopColor: COLORS.BG_SECONDARY,
+    paddingTop: SPACING.SM + 4,
+    marginTop: 2,
+  },
+  priceContainer: {
+    justifyContent: 'center',
   },
   priceLabel: {
     fontSize: 10,
-    color: COLORS.TEXT_SECONDARY,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.6,
+    marginBottom: 1,
+  },
+  priceValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
   },
   price: {
-    fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.H3 + 2,
+    fontWeight: '900',
     color: COLORS.PRIMARY,
+    letterSpacing: -0.3,
+  },
+  pricePeriod: {
+    fontSize: FONT_SIZE.BODY_SMALL - 1,
+    color: COLORS.TEXT_SECONDARY,
+    fontWeight: '500',
   },
   detailsBtn: {
     backgroundColor: COLORS.PRIMARY,
-    paddingVertical: SPACING.SM - 2,
-    paddingHorizontal: SPACING.MD,
+    paddingVertical: SPACING.SM,
+    paddingHorizontal: SPACING.MD + 2,
     borderRadius: BORDER_RADIUS.MD,
+    ...SHADOWS.SM,
   },
   detailsBtnText: {
     color: COLORS.WHITE,
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: FONT_SIZE.BODY_SMALL,
+    letterSpacing: 0.2,
   },
 });
 

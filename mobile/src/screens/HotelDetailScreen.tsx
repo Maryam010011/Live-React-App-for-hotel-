@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, SafeAreaView, TouchableOpacity, Share } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  Share,
+  StatusBar,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { fetchHotelById } from '../api/hotelApi';
 import { Hotel } from '../types/hotel';
 import { COLORS } from '../constants/colors';
-import { BORDER_RADIUS, FONT_SIZE, SPACING, SHADOWS } from '../constants/theme';
+import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 import { formatPrice } from '../utils/formatters';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
@@ -52,7 +62,7 @@ export default function HotelDetailScreen({ route, navigation }: Props) {
   };
 
   if (loading) {
-    return <LoadingSpinner message="Fetching details of the hotel..." fullScreen />;
+    return <LoadingSpinner message="Fetching hotel details..." fullScreen />;
   }
 
   if (error || !hotel) {
@@ -61,66 +71,105 @@ export default function HotelDetailScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {/* Main Image */}
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.NAVY_DARK} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ─── Main Hero Image ────────────────────────────────────────────── */}
         <View style={styles.imageContainer}>
-          <Image source={{ uri: hotel.image }} style={styles.image} resizeMode="cover" />
-          <TouchableOpacity style={styles.shareBadge} onPress={handleShare}>
-            <Text style={styles.shareText}>Share 📤</Text>
-          </TouchableOpacity>
+          <Image
+            source={{ uri: hotel.image }}
+            style={styles.image}
+            resizeMode="cover"
+          />
+          <View style={styles.topBadgesRow}>
+            <View style={styles.typeBadge}>
+              <Text style={styles.typeBadgeText}>{hotel.type.toUpperCase()}</Text>
+            </View>
+            <TouchableOpacity style={styles.shareBadge} onPress={handleShare}>
+              <Text style={styles.shareText}>Share 📤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Content Card */}
+        {/* ─── Content Body ───────────────────────────────────────────────── */}
         <View style={styles.contentCard}>
-          <View style={styles.headerRow}>
-            <Text style={styles.typeBadge}>{hotel.type}</Text>
+          {/* Header row: title and rating */}
+          <View style={styles.titleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{hotel.name}</Text>
+              <Text style={styles.location}>
+                📍 {hotel.address}, {hotel.city}, {hotel.country}
+              </Text>
+            </View>
             <View style={styles.ratingBox}>
-              <Text style={styles.ratingText}>⭐ {hotel.rating.toFixed(1)} / 5.0</Text>
+              <Text style={styles.ratingStar}>⭐</Text>
+              <Text style={styles.ratingNumber}>{hotel.rating.toFixed(1)}</Text>
+              <Text style={styles.ratingOutOf}>/ 5.0</Text>
             </View>
           </View>
 
-          <Text style={styles.name}>{hotel.name}</Text>
-          <Text style={styles.address}>📍 {hotel.address}, {hotel.city}, {hotel.country}</Text>
+          <View style={styles.divider} />
+
+          {/* ─── Specifications Grid (Matching Web App) ──────────────────── */}
+          <Text style={styles.sectionHeading}>Property Overview</Text>
+          <View style={styles.specGrid}>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>PROPERTY TYPE</Text>
+              <Text style={styles.specValue}>{hotel.type}</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>TOTAL ROOMS</Text>
+              <Text style={styles.specValue}>{hotel.rooms} Suites</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>CANCELLATION</Text>
+              <Text style={styles.specValueFree}>Free (24h)</Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>CHECK-IN</Text>
+              <Text style={styles.specValue}>3:00 PM</Text>
+            </View>
+          </View>
 
           <View style={styles.divider} />
 
-          {/* Description */}
-          <Text style={styles.sectionTitle}>Overview</Text>
+          {/* ─── Description ──────────────────────────────────────────────── */}
+          <Text style={styles.sectionHeading}>About the Property</Text>
           <Text style={styles.description}>{hotel.description}</Text>
 
           <View style={styles.divider} />
 
-          {/* Amenities Grid */}
-          <Text style={styles.sectionTitle}>Amenities</Text>
+          {/* ─── Amenities Grid ───────────────────────────────────────────── */}
+          <Text style={styles.sectionHeading}>Featured Amenities</Text>
           <View style={styles.amenitiesContainer}>
             {hotel.amenities.map((amenity, idx) => (
               <View key={idx} style={styles.amenityBadge}>
-                <Text style={styles.amenityText}>✔️ {amenity}</Text>
+                <Text style={styles.amenityCheck}>✓</Text>
+                <Text style={styles.amenityText}>{amenity}</Text>
               </View>
             ))}
           </View>
-
-          <View style={styles.divider} />
-
-          {/* Room configuration info */}
-          <Text style={styles.sectionTitle}>Rooms & Capacity</Text>
-          <Text style={styles.roomDesc}>
-            This property features {hotel.rooms} total luxury rooms. Standard, Deluxe, and Suite packages are available. Free cancellation is offered up to 24 hours prior to check-in.
-          </Text>
         </View>
       </ScrollView>
 
-      {/* Sticky Bottom Bar */}
+      {/* ─── Sticky Bottom Bar (Matching Web App) ─────────────────────────── */}
       <View style={styles.bottomBar}>
-        <View>
+        <View style={styles.priceColumn}>
           <Text style={styles.priceLabel}>RATES STARTING FROM</Text>
-          <Text style={styles.priceValue}>{formatPrice(hotel.price)} <Text style={styles.priceUnit}>/ night</Text></Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceValue}>{formatPrice(hotel.price)}</Text>
+            <Text style={styles.priceUnit}>/ night</Text>
+          </View>
         </View>
+
         <TouchableOpacity
           style={styles.bookBtn}
           onPress={() => navigation.navigate('Booking', { id: hotel.id })}
+          activeOpacity={0.88}
         >
-          <Text style={styles.bookBtnText}>Book Stay</Text>
+          <Text style={styles.bookBtnText}>Book Stay Now</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -130,14 +179,14 @@ export default function HotelDetailScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.BG_SECONDARY,
+    backgroundColor: COLORS.BG_PAGE,
   },
   scrollContainer: {
-    paddingBottom: 100, // Safe padding for bottom bar
+    paddingBottom: 110,
   },
   imageContainer: {
     width: '100%',
-    height: 240,
+    height: 260,
     position: 'relative',
     backgroundColor: COLORS.BG_SECONDARY,
   },
@@ -145,78 +194,134 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  shareBadge: {
+  topBadgesRow: {
     position: 'absolute',
     top: SPACING.MD,
+    left: SPACING.MD,
     right: SPACING.MD,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingVertical: SPACING.XS,
-    paddingHorizontal: SPACING.SM,
-    borderRadius: BORDER_RADIUS.SM,
-  },
-  shareText: {
-    color: COLORS.WHITE,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_SMALL,
-  },
-  contentCard: {
-    backgroundColor: COLORS.WHITE,
-    padding: SPACING.MD,
-    borderTopLeftRadius: BORDER_RADIUS.XL,
-    borderTopRightRadius: BORDER_RADIUS.XL,
-    marginTop: -BORDER_RADIUS.XL,
-    ...SHADOWS.MD,
-  },
-  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.SM,
   },
   typeBadge: {
-    backgroundColor: COLORS.SECONDARY_LIGHT,
-    color: COLORS.PRIMARY_DARK,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_SMALL,
-    paddingVertical: 4,
-    paddingHorizontal: SPACING.MD,
+    backgroundColor: COLORS.SECONDARY_GOLD,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
     borderRadius: BORDER_RADIUS.ROUND,
-    textTransform: 'uppercase',
+    ...SHADOWS.SM,
   },
-  ratingBox: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#fef3c7',
+  typeBadgeText: {
+    color: COLORS.WHITE,
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.6,
+  },
+  shareBadge: {
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: BORDER_RADIUS.ROUND,
+  },
+  shareText: {
+    color: COLORS.WHITE,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  contentCard: {
+    backgroundColor: COLORS.WHITE,
+    padding: SPACING.LG,
+    borderTopLeftRadius: BORDER_RADIUS.XXL,
+    borderTopRightRadius: BORDER_RADIUS.XXL,
+    marginTop: -BORDER_RADIUS.XL,
     borderWidth: 1,
-    paddingVertical: 4,
-    paddingHorizontal: SPACING.SM,
-    borderRadius: BORDER_RADIUS.MD,
+    borderColor: COLORS.BORDER,
+    ...SHADOWS.MD,
   },
-  ratingText: {
-    color: '#d97706',
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_SMALL,
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: SPACING.MD,
   },
   name: {
-    fontSize: FONT_SIZE.H1,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZE.H2,
+    fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
-    marginBottom: SPACING.XS,
+    letterSpacing: -0.3,
   },
-  address: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
+  location: {
+    fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
-    lineHeight: 20,
+    marginTop: 4,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  ratingBox: {
+    backgroundColor: COLORS.SECONDARY_LIGHT,
+    borderColor: COLORS.SECONDARY_MUTED,
+    borderWidth: 1.5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: BORDER_RADIUS.MD,
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  ratingStar: {
+    fontSize: 14,
+  },
+  ratingNumber: {
+    color: COLORS.SECONDARY,
+    fontWeight: '900',
+    fontSize: FONT_SIZE.BODY_LARGE,
+  },
+  ratingOutOf: {
+    color: COLORS.SECONDARY,
+    fontWeight: '600',
+    fontSize: 10,
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.BORDER,
-    marginVertical: SPACING.MD,
+    backgroundColor: COLORS.BG_SECONDARY,
+    marginVertical: SPACING.LG,
   },
-  sectionTitle: {
-    fontSize: FONT_SIZE.H3,
-    fontWeight: 'bold',
+  sectionHeading: {
+    fontSize: FONT_SIZE.BODY_LARGE,
+    fontWeight: '800',
     color: COLORS.TEXT_PRIMARY,
-    marginBottom: SPACING.SM,
+    marginBottom: SPACING.MD - 2,
+    letterSpacing: -0.2,
+  },
+  specGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: SPACING.SM,
+  },
+  specItem: {
+    width: '48%',
+    backgroundColor: COLORS.BG_SECONDARY,
+    padding: SPACING.MD - 2,
+    borderRadius: BORDER_RADIUS.MD,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+  },
+  specLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  specValue: {
+    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontWeight: '800',
+    color: COLORS.TEXT_PRIMARY,
+  },
+  specValueFree: {
+    fontSize: FONT_SIZE.BODY_MEDIUM,
+    fontWeight: '800',
+    color: COLORS.SUCCESS,
   },
   description: {
     fontSize: FONT_SIZE.BODY_MEDIUM,
@@ -226,66 +331,81 @@ const styles = StyleSheet.create({
   amenitiesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: SPACING.SM,
   },
   amenityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.BG_SECONDARY,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    borderRadius: BORDER_RADIUS.SM,
-    paddingVertical: SPACING.XS + 2,
-    paddingHorizontal: SPACING.SM,
-    marginRight: SPACING.SM,
-    marginBottom: SPACING.SM,
+    borderRadius: BORDER_RADIUS.MD,
+    paddingVertical: SPACING.SM - 2,
+    paddingHorizontal: SPACING.MD - 2,
+    gap: 6,
+  },
+  amenityCheck: {
+    color: COLORS.SUCCESS,
+    fontWeight: '900',
+    fontSize: 12,
   },
   amenityText: {
     fontSize: FONT_SIZE.BODY_SMALL,
-    color: COLORS.TEXT_PRIMARY,
-  },
-  roomDesc: {
-    fontSize: FONT_SIZE.BODY_MEDIUM,
-    color: COLORS.TEXT_SECONDARY,
-    lineHeight: 20,
+    color: COLORS.TEXT_DARK,
+    fontWeight: '600',
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.WHITE,
+    backgroundColor: COLORS.NAVY_DARK,
     borderTopWidth: 1,
-    borderTopColor: COLORS.BORDER,
-    padding: SPACING.MD,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: SPACING.MD,
+    paddingHorizontal: SPACING.LG,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     ...SHADOWS.LG,
   },
+  priceColumn: {
+    justifyContent: 'center',
+  },
   priceLabel: {
     fontSize: 9,
-    fontWeight: 'bold',
-    color: COLORS.TEXT_SECONDARY,
-    letterSpacing: 1,
+    fontWeight: '800',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+    marginTop: 1,
   },
   priceValue: {
     fontSize: FONT_SIZE.H2,
-    fontWeight: 'bold',
-    color: COLORS.PRIMARY,
+    fontWeight: '900',
+    color: COLORS.WHITE,
+    letterSpacing: -0.5,
   },
   priceUnit: {
     fontSize: FONT_SIZE.BODY_SMALL,
-    fontWeight: 'normal',
-    color: COLORS.TEXT_SECONDARY,
+    color: COLORS.TEXT_MUTED,
+    fontWeight: '600',
   },
   bookBtn: {
-    backgroundColor: COLORS.PRIMARY,
-    paddingVertical: SPACING.MD - 2,
-    paddingHorizontal: SPACING.XL,
+    backgroundColor: COLORS.SECONDARY,
+    paddingVertical: SPACING.SM + 4,
+    paddingHorizontal: SPACING.LG + 4,
     borderRadius: BORDER_RADIUS.MD,
-    ...SHADOWS.SM,
+    ...SHADOWS.GOLD_GLOW,
   },
   bookBtnText: {
     color: COLORS.WHITE,
-    fontWeight: 'bold',
-    fontSize: FONT_SIZE.BODY_LARGE,
+    fontWeight: '800',
+    fontSize: FONT_SIZE.BODY_MEDIUM,
+    letterSpacing: 0.2,
   },
 });
