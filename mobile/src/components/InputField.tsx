@@ -50,6 +50,8 @@ export const InputField = React.memo<InputFieldProps>(({
           placeholderTextColor={COLORS.TEXT_MUTED}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          importantForAutofill="no"
+          autoComplete="off"
           {...props}
         />
       </View>
