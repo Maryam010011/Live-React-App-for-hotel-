@@ -1,4 +1,5 @@
-﻿import React from 'react';
+﻿import React, { useMemo, useCallback } from 'react';
+import { NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
@@ -23,8 +24,14 @@ import AdminHotelFormScreen from '../screens/AdminHotelFormScreen';
 import AdminBookingsScreen from '../screens/AdminBookingsScreen';
 
 // --- Navigation Type Definitions ----------------------------------------------
+export type MainTabParamList = {
+  [ROUTES.HOME]: undefined;
+  [ROUTES.MY_BOOKINGS]: undefined;
+  [ROUTES.ADMIN_HOTELS]: undefined;
+};
+
 export type RootStackParamList = {
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList>;
   HotelList: { city?: string; minPrice?: number; maxPrice?: number; minRating?: number } | undefined;
   HotelDetail: { id: number | string };
   Booking: { id: number | string };
@@ -86,57 +93,41 @@ function MainTabNavigator() {
    */
   const insets = useSafeAreaInsets();
 
+  const tabBarStyle = useMemo(() => ({
+    backgroundColor: COLORS.WHITE,
+    borderTopColor: COLORS.BORDER,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    ...(Platform.OS === 'android'
+      ? { elevation: 8 }
+      : {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        }),
+    height: TAB_BAR_BASE_HEIGHT + insets.bottom,
+    paddingTop: TAB_BAR_INNER_PADDING_TOP,
+    paddingBottom: TAB_BAR_INNER_PADDING_BOTTOM + insets.bottom,
+  }), [insets.bottom]);
+
+  const screenOptions = useCallback(({ route }: { route: any }) => ({
+    tabBarIcon: ({ focused }: { focused: boolean }) => {
+      const iconSet = TAB_ICONS[route.name];
+      if (!iconSet) return null;
+      const iconName: IoniconsName = focused ? iconSet.active : iconSet.inactive;
+      const color = focused ? COLORS.PRIMARY : COLORS.TEXT_SECONDARY;
+      return <Ionicons name={iconName} size={TAB_ICON_SIZE} color={color} />;
+    },
+    tabBarActiveTintColor: COLORS.PRIMARY,
+    tabBarInactiveTintColor: COLORS.TEXT_SECONDARY,
+    tabBarLabelStyle: styles.tabLabel,
+    tabBarStyle,
+    headerShown: false,
+  }), [tabBarStyle]);
+
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        /**
-         * Ionicons vector icons:
-         *   Active   -> filled variant in brand PRIMARY (#1a5f7a)
-         *   Inactive -> outline variant in TEXT_SECONDARY (#636e72)
-         */
-        tabBarIcon: ({ focused }) => {
-          const iconSet = TAB_ICONS[route.name];
-          if (!iconSet) return null;
-          const iconName: IoniconsName = focused ? iconSet.active : iconSet.inactive;
-          const color = focused ? COLORS.PRIMARY : COLORS.TEXT_SECONDARY;
-          return <Ionicons name={iconName} size={TAB_ICON_SIZE} color={color} />;
-        },
-
-        tabBarActiveTintColor: COLORS.PRIMARY,
-        tabBarInactiveTintColor: COLORS.TEXT_SECONDARY,
-        tabBarLabelStyle: styles.tabLabel,
-
-        /**
-         * Tab bar container:
-         *   - Pure white background (--bg-primary from index.css)
-         *   - Hairline top border in slate-200 (#e2e8f0)
-         *   - Platform shadow mirrors web app --shadow-sm (index.css:28):
-         *       0 2px 4px rgba(0,0,0,0.1) — flipped upward for tab bar
-         *   - Height & paddingBottom grow dynamically with insets.bottom
-         *     to avoid being clipped by system home indicator / gesture bar
-         */
-        tabBarStyle: {
-          backgroundColor: COLORS.BG_PRIMARY,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: COLORS.BORDER,
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: -2 },
-              shadowOpacity: 0.08,
-              shadowRadius: 8,
-            },
-            android: {
-              elevation: 12,
-            },
-          }),
-          height: TAB_BAR_BASE_HEIGHT + insets.bottom,
-          paddingTop: TAB_BAR_INNER_PADDING_TOP,
-          paddingBottom: TAB_BAR_INNER_PADDING_BOTTOM + insets.bottom,
-        },
-
-        headerShown: false,
-      })}
+      screenOptions={screenOptions}
     >
       {/* Explore tab */}
       <Tab.Screen

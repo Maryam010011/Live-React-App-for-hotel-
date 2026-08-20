@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -82,6 +82,25 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
       setLoading(false);
     }
   };
+
+  const fieldHandlers = useMemo(() => {
+    const create = (field: string) => (val: string) => {
+      setFormData((prev) => ({ ...prev, [field]: val }));
+    };
+    return {
+      image: create('image'),
+      name: create('name'),
+      city: create('city'),
+      country: create('country'),
+      address: create('address'),
+      description: create('description'),
+      price: create('price'),
+      rating: create('rating'),
+      rooms: create('rooms'),
+      type: create('type'),
+      amenitiesStr: create('amenitiesStr'),
+    };
+  }, []);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -253,9 +272,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
               label="Or Direct Image URL"
               placeholder="https://..."
               value={formData.image}
-              onChangeText={(val) =>
-                setFormData((prev) => ({ ...prev, image: val }))
-              }
+              onChangeText={fieldHandlers.image}
             />
           </View>
 
@@ -267,9 +284,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
               label="Property Name *"
               placeholder="e.g. The Grand Palace Resort"
               value={formData.name}
-              onChangeText={(val) =>
-                setFormData((prev) => ({ ...prev, name: val }))
-              }
+              onChangeText={fieldHandlers.name}
               error={fieldErrors.name}
             />
 
@@ -279,9 +294,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
                   label="City *"
                   placeholder="Dubai"
                   value={formData.city}
-                  onChangeText={(val) =>
-                    setFormData((prev) => ({ ...prev, city: val }))
-                  }
+                  onChangeText={fieldHandlers.city}
                   error={fieldErrors.city}
                 />
               </View>
@@ -290,9 +303,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
                   label="Country *"
                   placeholder="UAE"
                   value={formData.country}
-                  onChangeText={(val) =>
-                    setFormData((prev) => ({ ...prev, country: val }))
-                  }
+                  onChangeText={fieldHandlers.country}
                   error={fieldErrors.country}
                 />
               </View>
@@ -302,18 +313,14 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
               label="Street Address"
               placeholder="123 Luxury Blvd, Marina District"
               value={formData.address}
-              onChangeText={(val) =>
-                setFormData((prev) => ({ ...prev, address: val }))
-              }
+              onChangeText={fieldHandlers.address}
             />
 
             <InputField
               label="Property Overview & Description"
               placeholder="Describe the hotel atmosphere, views, and luxury features..."
               value={formData.description}
-              onChangeText={(val) =>
-                setFormData((prev) => ({ ...prev, description: val }))
-              }
+              onChangeText={fieldHandlers.description}
               multiline
               numberOfLines={3}
             />
@@ -329,9 +336,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
                   label="Base Price ($/nt) *"
                   placeholder="250"
                   value={formData.price}
-                  onChangeText={(val) =>
-                    setFormData((prev) => ({ ...prev, price: val }))
-                  }
+                  onChangeText={fieldHandlers.price}
                   error={fieldErrors.price}
                   keyboardType="numeric"
                 />
@@ -341,9 +346,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
                   label="Total Rooms"
                   placeholder="50"
                   value={formData.rooms}
-                  onChangeText={(val) =>
-                    setFormData((prev) => ({ ...prev, rooms: val }))
-                  }
+                  onChangeText={fieldHandlers.rooms}
                   keyboardType="numeric"
                 />
               </View>
@@ -355,9 +358,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
                   label="Initial Rating"
                   placeholder="4.8"
                   value={formData.rating}
-                  onChangeText={(val) =>
-                    setFormData((prev) => ({ ...prev, rating: val }))
-                  }
+                  onChangeText={fieldHandlers.rating}
                   keyboardType="numeric"
                 />
               </View>
@@ -366,9 +367,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
                   label="Category Type"
                   placeholder="Resort, Luxury, Boutique"
                   value={formData.type}
-                  onChangeText={(val) =>
-                    setFormData((prev) => ({ ...prev, type: val }))
-                  }
+                  onChangeText={fieldHandlers.type}
                 />
               </View>
             </View>
@@ -377,9 +376,7 @@ export default function AdminHotelFormScreen({ route, navigation }: Props) {
               label="Amenities (comma-separated)"
               placeholder="Free WiFi, Swimming Pool, Spa, Ocean View..."
               value={formData.amenitiesStr}
-              onChangeText={(val) =>
-                setFormData((prev) => ({ ...prev, amenitiesStr: val }))
-              }
+              onChangeText={fieldHandlers.amenitiesStr}
               multiline
               numberOfLines={2}
             />

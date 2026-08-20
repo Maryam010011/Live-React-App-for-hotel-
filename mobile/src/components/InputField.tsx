@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { BORDER_RADIUS, FONT_SIZE, SPACING } from '../constants/theme';
@@ -10,7 +10,7 @@ interface InputFieldProps extends TextInputProps {
   leftIcon?: React.ReactNode;
 }
 
-export const InputField: React.FC<InputFieldProps> = ({
+export const InputField = React.memo<InputFieldProps>(({
   label,
   error,
   helperText,
@@ -21,6 +21,18 @@ export const InputField: React.FC<InputFieldProps> = ({
   ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
+
+  const handleFocus = useCallback((e: any) => {
+    setIsFocused(true);
+    if (onFocus) onFocus(e);
+  }, [onFocus]);
+
+  const handleBlur = useCallback((e: any) => {
+    setIsFocused(false);
+    if (onBlur) onBlur(e);
+  }, [onBlur]);
+
+  const inputStyle = useMemo(() => [styles.input, style], [style]);
 
   return (
     <View style={styles.container}>
@@ -34,16 +46,10 @@ export const InputField: React.FC<InputFieldProps> = ({
       >
         {leftIcon ? <View style={styles.iconContainer}>{leftIcon}</View> : null}
         <TextInput
-          style={[styles.input, style]}
+          style={inputStyle}
           placeholderTextColor={COLORS.TEXT_MUTED}
-          onFocus={(e) => {
-            setIsFocused(true);
-            if (onFocus) onFocus(e);
-          }}
-          onBlur={(e) => {
-            setIsFocused(false);
-            if (onBlur) onBlur(e);
-          }}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           {...props}
         />
       </View>
@@ -54,7 +60,7 @@ export const InputField: React.FC<InputFieldProps> = ({
       ) : null}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

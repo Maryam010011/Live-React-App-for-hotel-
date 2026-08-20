@@ -189,7 +189,7 @@ export default function MyBookingsScreen({ navigation }: any) {
         </View>
         <TouchableOpacity
           style={styles.bookAnotherBtn}
-          onPress={() => navigation.navigate('Home')}
+          onPress={() => navigation.navigate('MainTabs')}
           activeOpacity={0.88}
         >
           <Text style={styles.bookAnotherBtnText}>+ Book Stays</Text>

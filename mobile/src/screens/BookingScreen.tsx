@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -149,10 +149,30 @@ export default function BookingScreen({ route, navigation }: Props) {
   const taxesAndFees = Math.round(subtotal * 0.12);
   const totalPrice = subtotal + taxesAndFees;
 
-  const handleInputChange = (field: keyof BookingFormData, val: any) => {
+  const handleInputChange = useCallback((field: keyof BookingFormData, val: any) => {
     setFormData((prev) => ({ ...prev, [field]: val }));
     setFieldErrors((prev) => ({ ...prev, [field]: null }));
-  };
+  }, []);
+
+  const fieldHandlers = useMemo(() => {
+    const create = (field: keyof BookingFormData) => (val: any) => {
+      setFormData((prev) => ({ ...prev, [field]: val }));
+      setFieldErrors((prev) => ({ ...prev, [field]: null }));
+    };
+    return {
+      firstName: create('firstName'),
+      lastName: create('lastName'),
+      email: create('email'),
+      phone: create('phone'),
+      checkIn: create('checkIn'),
+      checkOut: create('checkOut'),
+      specialRequests: create('specialRequests'),
+      cardName: create('cardName'),
+      cardNumber: create('cardNumber'),
+      cardExpiry: create('cardExpiry'),
+      cardCvc: create('cardCvc'),
+    };
+  }, []);
 
   const handleSubmit = async () => {
     if (!user) {
@@ -323,7 +343,7 @@ export default function BookingScreen({ route, navigation }: Props) {
 
             <Button
               title="View My Bookings"
-              onPress={() => navigation.navigate(ROUTES.MY_BOOKINGS as any)}
+              onPress={() => navigation.navigate('MainTabs', { screen: ROUTES.MY_BOOKINGS })}
               style={styles.receiptBtn}
               size="lg"
             />
@@ -388,7 +408,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                   label="First Name *"
                   placeholder="John"
                   value={formData.firstName}
-                  onChangeText={(val) => handleInputChange('firstName', val)}
+                  onChangeText={fieldHandlers.firstName}
                   error={fieldErrors.firstName}
                 />
               </View>
@@ -397,7 +417,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                   label="Last Name *"
                   placeholder="Doe"
                   value={formData.lastName}
-                  onChangeText={(val) => handleInputChange('lastName', val)}
+                  onChangeText={fieldHandlers.lastName}
                   error={fieldErrors.lastName}
                 />
               </View>
@@ -407,7 +427,7 @@ export default function BookingScreen({ route, navigation }: Props) {
               label="Email Address *"
               placeholder="john@example.com"
               value={formData.email}
-              onChangeText={(val) => handleInputChange('email', val)}
+              onChangeText={fieldHandlers.email}
               error={fieldErrors.email}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -417,7 +437,7 @@ export default function BookingScreen({ route, navigation }: Props) {
               label="Phone Number *"
               placeholder="+1 (555) 000-0000"
               value={formData.phone}
-              onChangeText={(val) => handleInputChange('phone', val)}
+              onChangeText={fieldHandlers.phone}
               error={fieldErrors.phone}
               keyboardType="phone-pad"
             />
@@ -443,7 +463,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                   label="Check-In Date *"
                   placeholder="YYYY-MM-DD"
                   value={formData.checkIn}
-                  onChangeText={(val) => handleInputChange('checkIn', val)}
+                  onChangeText={fieldHandlers.checkIn}
                   error={fieldErrors.checkIn}
                 />
               </View>
@@ -452,7 +472,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                   label="Check-Out Date *"
                   placeholder="YYYY-MM-DD"
                   value={formData.checkOut}
-                  onChangeText={(val) => handleInputChange('checkOut', val)}
+                  onChangeText={fieldHandlers.checkOut}
                   error={fieldErrors.checkOut}
                 />
               </View>
@@ -496,7 +516,7 @@ export default function BookingScreen({ route, navigation }: Props) {
               label="Special Requests (Optional)"
               placeholder="High floor, quiet room, late check-in..."
               value={formData.specialRequests}
-              onChangeText={(val) => handleInputChange('specialRequests', val)}
+              onChangeText={fieldHandlers.specialRequests}
               multiline
               numberOfLines={2}
             />
@@ -547,14 +567,14 @@ export default function BookingScreen({ route, navigation }: Props) {
                   label="Cardholder Name *"
                   placeholder="e.g. John Doe"
                   value={formData.cardName}
-                  onChangeText={(val) => handleInputChange('cardName', val)}
+                  onChangeText={fieldHandlers.cardName}
                   error={fieldErrors.cardName}
                 />
                 <InputField
                   label="Card Number"
                   placeholder="4532 •••• •••• 8892"
                   value={formData.cardNumber}
-                  onChangeText={(val) => handleInputChange('cardNumber', val)}
+                  onChangeText={fieldHandlers.cardNumber}
                 />
                 <View style={styles.row}>
                   <View style={styles.halfWidth}>
@@ -562,7 +582,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                       label="Expiry Date"
                       placeholder="MM/YY"
                       value={formData.cardExpiry}
-                      onChangeText={(val) => handleInputChange('cardExpiry', val)}
+                      onChangeText={fieldHandlers.cardExpiry}
                     />
                   </View>
                   <View style={styles.halfWidth}>
@@ -570,7 +590,7 @@ export default function BookingScreen({ route, navigation }: Props) {
                       label="CVC Code"
                       placeholder="882"
                       value={formData.cardCvc}
-                      onChangeText={(val) => handleInputChange('cardCvc', val)}
+                      onChangeText={fieldHandlers.cardCvc}
                       secureTextEntry
                     />
                   </View>

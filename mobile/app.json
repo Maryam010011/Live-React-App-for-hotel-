@@ -16,14 +16,21 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
       "package": "com.maryam5jahangir.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow LuxeStay to access your camera for property photos.",
+          "photosPermission": "Allow LuxeStay to access your photo library for property uploads."
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

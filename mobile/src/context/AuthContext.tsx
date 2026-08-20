@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { AuthUser } from '../types/user';
 import { authLogin, authRegister, authGetMe, authLogout } from '../api/authApi';
 import { getStoredToken, setStoredToken } from '../utils/storage';
@@ -43,36 +43,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     restoreSession();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const data = await authLogin(email, password);
     setToken(data.token);
     setUser(data.user);
-  };
+  }, []);
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = useCallback(async (name: string, email: string, password: string) => {
     const data = await authRegister(name, email, password);
     setToken(data.token);
     setUser(data.user);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     await authLogout();
     setToken(null);
     setUser(null);
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      user,
+      token,
+      loading,
+      login,
+      register,
+      logout,
+      isAdmin: user?.role === 'admin',
+    }),
+    [user, token, loading, login, register, logout]
+  );
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        loading,
-        login,
-        register,
-        logout,
-        isAdmin: user?.role === 'admin',
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
