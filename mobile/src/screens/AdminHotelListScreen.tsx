@@ -1,26 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   Image,
   TouchableOpacity,
+  SafeAreaView,
   Modal,
   StatusBar,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { fetchHotels, deleteHotel } from '../api/hotelApi';
 import { Hotel } from '../types/hotel';
 import { COLORS } from '../constants/colors';
 import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 import { formatPrice } from '../utils/formatters';
+import InputField from '../components/InputField';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
-import InputField from '../components/InputField';
-import Button from '../components/Button';
+
+const CATEGORIES = ['All', 'Luxury', 'Resort', 'Boutique', 'Business', 'Lodge'];
 
 export default function AdminHotelListScreen({ navigation }: any) {
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -29,6 +31,8 @@ export default function AdminHotelListScreen({ navigation }: any) {
   const [error, setError] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Hotel | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -71,11 +75,35 @@ export default function AdminHotelListScreen({ navigation }: any) {
     }
   };
 
-  const filteredHotels = hotels.filter(
-    (h) =>
-      h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      h.city.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Live matching suggestions for search bar (Google-style experience)
+  const searchSuggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return hotels
+      .filter(
+        (h) =>
+          h.name.toLowerCase().includes(q) ||
+          h.city.toLowerCase().includes(q) ||
+          h.country.toLowerCase().includes(q)
+      )
+      .slice(0, 4);
+  }, [hotels, searchQuery]);
+
+  const filteredHotels = useMemo(() => {
+    return hotels.filter((h) => {
+      const matchesQuery =
+        !searchQuery.trim() ||
+        h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        h.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        h.country.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesCategory =
+        selectedCategory === 'All' ||
+        (h.type && h.type.toLowerCase() === selectedCategory.toLowerCase());
+
+      return matchesQuery && matchesCategory;
+    });
+  }, [hotels, searchQuery, selectedCategory]);
 
   const renderItem = useCallback(
     ({ item }: { item: Hotel }) => (
@@ -151,14 +179,101 @@ export default function AdminHotelListScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
+      {/* Search Section with Live Auto-Suggest */}
       <View style={styles.searchSection}>
-        <InputField
-          label=""
-          placeholder="Filter by hotel name or city..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          leftIcon={<Text>🔍</Text>}
-        />
+        <View style={styles.searchFieldContainer}>
+          <InputField
+            placeholder="Filter by hotel name, city, or country..."
+            value={searchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              if (!isSearchFocused) setIsSearchFocused(true);
+            }}
+            onFocus={() => setIsSearchFocused(true)}
+            leftIcon={<Ionicons name="search-outline" size={18} color={COLORS.PRIMARY} />}
+          />
+
+          {searchQuery.length > 0 ? (
+            <TouchableOpacity
+              style={styles.clearSearchBtn}
+              onPress={() => {
+                setSearchQuery('');
+                setIsSearchFocused(false);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={18} color={COLORS.TEXT_MUTED} />
+            </TouchableOpacity>
+          ) : null}
+
+          {/* Live Auto-suggest Dropdown */}
+          {isSearchFocused && searchSuggestions.length > 0 && (
+            <View style={styles.suggestionsDropdown}>
+              <View style={styles.suggestionsHeader}>
+                <Text style={styles.suggestionsHeaderText}>MATCHING PROPERTIES</Text>
+                <TouchableOpacity onPress={() => setIsSearchFocused(false)}>
+                  <Text style={styles.suggestionsCloseText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+
+              {searchSuggestions.map((item, idx) => (
+                <TouchableOpacity
+                  key={String(item.id) + idx}
+                  style={[
+                    styles.suggestionRow,
+                    idx === searchSuggestions.length - 1 && styles.suggestionRowLast,
+                  ]}
+                  onPress={() => {
+                    setSearchQuery(item.name);
+                    setIsSearchFocused(false);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Image source={{ uri: item.image }} style={styles.suggestionThumb} />
+                  <View style={styles.suggestionInfo}>
+                    <Text style={styles.suggestionName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.suggestionLoc} numberOfLines={1}>
+                      📍 {item.city}, {item.country} • {item.type}
+                    </Text>
+                  </View>
+                  <Text style={styles.suggestionPrice}>{formatPrice(item.price)}/nt</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Category Filter Pills / Dropdown Tabs */}
+        <View style={styles.categoryScroll}>
+          <FlatList
+            horizontal
+            data={CATEGORIES}
+            keyExtractor={(cat) => cat}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryPillContainer}
+            renderItem={({ item: cat }) => (
+              <TouchableOpacity
+                style={[
+                  styles.categoryPill,
+                  selectedCategory === cat && styles.categoryPillActive,
+                ]}
+                onPress={() => setSelectedCategory(cat)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.categoryPillText,
+                    selectedCategory === cat && styles.categoryPillTextActive,
+                  ]}
+                >
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
       </View>
 
       {loading ? (
@@ -183,12 +298,22 @@ export default function AdminHotelListScreen({ navigation }: any) {
                 </Text>{' '}
                 properties
               </Text>
+              {(searchQuery || selectedCategory !== 'All') && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('All');
+                  }}
+                >
+                  <Text style={styles.resetFilterText}>Clear Filters</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
           ListEmptyComponent={
             <EmptyState
               message="No Hotels Found"
-              suggestion="No properties match your filter criteria."
+              suggestion="No properties match your search criteria."
               icon="🏢"
             />
           }
@@ -198,31 +323,37 @@ export default function AdminHotelListScreen({ navigation }: any) {
       {/* Delete Confirmation Modal */}
       <Modal visible={!!deleteTarget} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalIcon}>⚠️</Text>
-            <Text style={styles.modalTitle}>Confirm Property Removal</Text>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconBox}>
+              <Ionicons name="trash-outline" size={28} color={COLORS.ERROR} />
+            </View>
+            <Text style={styles.modalTitle}>Delete Hotel Listing?</Text>
             <Text style={styles.modalText}>
-              Are you sure you want to delete{' '}
-              <Text style={{ fontWeight: '800', color: COLORS.TEXT_PRIMARY }}>
+              Are you sure you want to permanently delete{' '}
+              <Text style={{ fontWeight: '700', color: COLORS.TEXT_PRIMARY }}>
                 "{deleteTarget?.name}"
               </Text>
               ? This action cannot be undone.
             </Text>
 
             <View style={styles.modalActions}>
-              <Button
-                title="Cancel"
-                variant="outline"
+              <TouchableOpacity
+                style={styles.cancelModalBtn}
                 onPress={() => setDeleteTarget(null)}
-                style={styles.modalBtn}
-              />
-              <Button
-                title="Delete Property"
-                variant="danger"
+                disabled={deleting}
+              >
+                <Text style={styles.cancelModalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmDeleteBtn}
                 onPress={handleConfirmDelete}
-                loading={deleting}
-                style={styles.modalBtn}
-              />
+                disabled={deleting}
+              >
+                <Text style={styles.confirmDeleteBtnText}>
+                  {deleting ? 'Deleting...' : 'Delete Listing'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -238,19 +369,17 @@ const styles = StyleSheet.create({
   },
   topHeader: {
     backgroundColor: COLORS.NAVY_DARK,
-    paddingVertical: SPACING.LG,
-    paddingHorizontal: SPACING.MD,
+    padding: SPACING.LG,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: SPACING.MD,
-    ...SHADOWS.MD,
   },
   headerTag: {
     fontSize: 10,
     fontWeight: '800',
     color: COLORS.SECONDARY_GOLD,
-    letterSpacing: 1.2,
+    letterSpacing: 1,
   },
   headerTitle: {
     fontSize: FONT_SIZE.H2,
@@ -268,68 +397,180 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.SM + 2,
     paddingHorizontal: SPACING.MD,
     borderRadius: BORDER_RADIUS.MD,
-    ...SHADOWS.PRIMARY_GLOW,
+    alignSelf: 'center',
+    ...SHADOWS.SM,
   },
   addBtnText: {
     color: COLORS.WHITE,
-    fontWeight: '800',
     fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '800',
   },
   searchSection: {
     paddingHorizontal: SPACING.MD,
     paddingTop: SPACING.MD,
+    backgroundColor: COLORS.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
+    zIndex: 100,
+  },
+  searchFieldContainer: {
+    position: 'relative',
+    zIndex: 200,
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    right: 14,
+    top: 14,
+    zIndex: 210,
+  },
+  suggestionsDropdown: {
+    backgroundColor: COLORS.WHITE,
+    borderRadius: BORDER_RADIUS.MD,
+    borderWidth: 1.5,
+    borderColor: COLORS.PRIMARY_TINT,
+    marginTop: -8,
+    marginBottom: SPACING.SM,
+    ...SHADOWS.MD,
+    overflow: 'hidden',
+  },
+  suggestionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: 7,
+    backgroundColor: COLORS.BG_SECONDARY,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
+  },
+  suggestionsHeaderText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.TEXT_MUTED,
+    letterSpacing: 0.8,
+  },
+  suggestionsCloseText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
+    gap: 10,
+  },
+  suggestionRowLast: {
+    borderBottomWidth: 0,
+  },
+  suggestionThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: COLORS.BG_SECONDARY,
+  },
+  suggestionInfo: {
+    flex: 1,
+  },
+  suggestionName: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '700',
+    color: COLORS.TEXT_PRIMARY,
+  },
+  suggestionLoc: {
+    fontSize: 11,
+    color: COLORS.TEXT_SECONDARY,
+    marginTop: 1,
+  },
+  suggestionPrice: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.PRIMARY,
+  },
+  categoryScroll: {
+    paddingBottom: SPACING.SM,
+  },
+  categoryPillContainer: {
+    gap: SPACING.XS,
+  },
+  categoryPill: {
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.ROUND,
+    backgroundColor: COLORS.BG_PAGE,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+  },
+  categoryPillActive: {
+    backgroundColor: COLORS.PRIMARY,
+    borderColor: COLORS.PRIMARY,
+  },
+  categoryPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.TEXT_SECONDARY,
+  },
+  categoryPillTextActive: {
+    color: COLORS.WHITE,
+  },
+  list: {
+    padding: SPACING.MD,
+    paddingBottom: SPACING.XXL + 30,
   },
   counterRow: {
-    marginBottom: SPACING.SM,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.SM + 2,
   },
   counterText: {
     fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '600',
     color: COLORS.TEXT_SECONDARY,
   },
-  list: {
-    paddingHorizontal: SPACING.MD,
-    paddingBottom: SPACING.XXL,
+  resetFilterText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
   },
   hotelRowCard: {
+    flexDirection: 'row',
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.LG,
+    padding: SPACING.MD,
+    marginBottom: SPACING.SM + 2,
     borderWidth: 1,
     borderColor: COLORS.BORDER,
-    padding: SPACING.SM + 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.MD - 2,
-    gap: SPACING.MD,
     ...SHADOWS.SM,
+    alignItems: 'center',
+    gap: SPACING.MD,
   },
   thumb: {
-    width: 72,
-    height: 72,
+    width: 65,
+    height: 65,
     borderRadius: BORDER_RADIUS.MD,
-    backgroundColor: COLORS.BG_SECONDARY,
   },
   infoCol: {
     flex: 1,
   },
   titleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+    gap: 6,
   },
   name: {
     fontSize: FONT_SIZE.BODY_MEDIUM,
     fontWeight: '800',
     color: COLORS.TEXT_PRIMARY,
-    flex: 1,
-    marginRight: 4,
+    flexShrink: 1,
   },
   typeBadge: {
     backgroundColor: COLORS.PRIMARY_SURFACE,
-    borderWidth: 1,
-    borderColor: COLORS.PRIMARY_TINT,
-    paddingVertical: 1,
     paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: BORDER_RADIUS.SM,
   },
   typeBadgeText: {
@@ -338,95 +579,131 @@ const styles = StyleSheet.create({
     color: COLORS.PRIMARY,
   },
   location: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.BODY_SMALL - 1,
     color: COLORS.TEXT_SECONDARY,
-    marginBottom: 4,
+    marginVertical: 2,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.SM,
+    marginTop: 2,
   },
   price: {
-    fontSize: 12,
-    fontWeight: '900',
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '800',
     color: COLORS.PRIMARY,
   },
   rating: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.BODY_SMALL,
     fontWeight: '700',
-    color: COLORS.SECONDARY,
+    color: COLORS.TEXT_SECONDARY,
   },
   rooms: {
-    fontSize: 11,
+    fontSize: FONT_SIZE.BODY_SMALL - 1,
     color: COLORS.TEXT_MUTED,
   },
   actionsCol: {
     gap: 6,
   },
   editBtn: {
-    backgroundColor: COLORS.PRIMARY,
+    backgroundColor: COLORS.PRIMARY_SURFACE,
+    paddingHorizontal: SPACING.MD,
     paddingVertical: 5,
-    paddingHorizontal: 12,
     borderRadius: BORDER_RADIUS.SM,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY_TINT,
+    alignItems: 'center',
   },
   editBtnText: {
-    color: COLORS.WHITE,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
+    color: COLORS.PRIMARY,
   },
   deleteBtn: {
     backgroundColor: COLORS.ERROR_BG,
+    paddingHorizontal: SPACING.MD,
+    paddingVertical: 5,
+    borderRadius: BORDER_RADIUS.SM,
     borderWidth: 1,
     borderColor: COLORS.ERROR_BORDER,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: BORDER_RADIUS.SM,
+    alignItems: 'center',
   },
   deleteBtnText: {
-    color: COLORS.ERROR,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
+    color: COLORS.ERROR,
   },
+
+  /* Modal */
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.LG,
   },
-  modalContent: {
+  modalCard: {
     backgroundColor: COLORS.WHITE,
     borderRadius: BORDER_RADIUS.XL,
     padding: SPACING.XL,
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 380,
     alignItems: 'center',
     ...SHADOWS.LG,
   },
-  modalIcon: {
-    fontSize: 40,
-    marginBottom: SPACING.SM,
+  modalIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.ERROR_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.MD,
   },
   modalTitle: {
     fontSize: FONT_SIZE.H3,
     fontWeight: '900',
     color: COLORS.TEXT_PRIMARY,
     marginBottom: SPACING.SM,
+    textAlign: 'center',
   },
   modalText: {
     fontSize: FONT_SIZE.BODY_SMALL,
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
-    marginBottom: SPACING.LG,
     lineHeight: 18,
+    marginBottom: SPACING.LG,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: SPACING.MD,
+    gap: SPACING.SM,
     width: '100%',
   },
-  modalBtn: {
+  cancelModalBtn: {
     flex: 1,
+    paddingVertical: SPACING.SM + 4,
+    borderRadius: BORDER_RADIUS.MD,
+    backgroundColor: COLORS.BG_PAGE,
+    borderWidth: 1,
+    borderColor: COLORS.BORDER,
+    alignItems: 'center',
+  },
+  cancelModalBtnText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '700',
+    color: COLORS.TEXT_SECONDARY,
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    paddingVertical: SPACING.SM + 4,
+    borderRadius: BORDER_RADIUS.MD,
+    backgroundColor: COLORS.ERROR,
+    alignItems: 'center',
+  },
+  confirmDeleteBtnText: {
+    fontSize: FONT_SIZE.BODY_SMALL,
+    fontWeight: '700',
+    color: COLORS.WHITE,
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { BORDER_RADIUS, FONT_SIZE, SHADOWS, SPACING } from '../constants/theme';
 
@@ -7,12 +7,16 @@ interface EmptyStateProps {
   message?: string;
   suggestion?: string;
   icon?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
   message = 'No data found',
   suggestion,
   icon = '🏨',
+  actionLabel,
+  onAction,
 }) => {
   return (
     <View style={styles.container}>
@@ -21,6 +25,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       </View>
       <Text style={styles.message}>{message}</Text>
       {suggestion && <Text style={styles.suggestion}>{suggestion}</Text>}
+      {actionLabel && onAction && (
+        <TouchableOpacity style={styles.actionBtn} onPress={onAction} activeOpacity={0.85}>
+          <Text style={styles.actionBtnText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -61,6 +70,19 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_SECONDARY,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  actionBtn: {
+    marginTop: SPACING.LG,
+    backgroundColor: COLORS.PRIMARY,
+    paddingVertical: SPACING.SM + 2,
+    paddingHorizontal: SPACING.XL,
+    borderRadius: BORDER_RADIUS.MD,
+    ...SHADOWS.SM,
+  },
+  actionBtnText: {
+    color: COLORS.WHITE,
+    fontWeight: '800',
+    fontSize: FONT_SIZE.BODY_MEDIUM,
   },
 });
 

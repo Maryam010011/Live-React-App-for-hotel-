@@ -189,7 +189,7 @@ export default function MyBookingsScreen({ navigation }: any) {
         </View>
         <TouchableOpacity
           style={styles.bookAnotherBtn}
-          onPress={() => navigation.navigate('MainTabs')}
+          onPress={() => navigation.navigate('HotelList', {})}
           activeOpacity={0.88}
         >
           <Text style={styles.bookAnotherBtnText}>+ Book Stays</Text>
@@ -219,6 +219,8 @@ export default function MyBookingsScreen({ navigation }: any) {
               message="No Reservations Found"
               suggestion="You haven't booked any hotel stays yet. Explore our premier hotel catalog to plan your next retreat!"
               icon="🏨"
+              actionLabel="Browse Hotels"
+              onAction={() => navigation.navigate('HotelList', {})}
             />
           }
         />

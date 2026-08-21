@@ -53,7 +53,7 @@ export default function LoginScreen({ route, navigation }: Props) {
       if (redirectScreen) {
         navigation.replace(redirectScreen as any, redirectParams);
       } else {
-        navigation.navigate('MainTabs');
+        navigation.navigate('MainTabs' as any);
       }
     } catch (err: any) {
       setGeneralError(err.message || 'Login failed. Please check your credentials.');

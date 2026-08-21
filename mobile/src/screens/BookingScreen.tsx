@@ -350,7 +350,7 @@ export default function BookingScreen({ route, navigation }: Props) {
             <Button
               title="Explore More Hotels"
               variant="outline"
-              onPress={() => navigation.navigate('MainTabs')}
+              onPress={() => navigation.navigate('MainTabs' as any)}
               size="md"
             />
           </View>

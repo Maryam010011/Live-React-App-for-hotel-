@@ -58,7 +58,7 @@ export default function RegisterScreen({ route, navigation }: Props) {
       if (redirectScreen) {
         navigation.replace(redirectScreen as any, redirectParams);
       } else {
-        navigation.navigate('MainTabs');
+        navigation.navigate('MainTabs' as any);
       }
     } catch (err: any) {
       setGeneralError(err.message || 'Registration failed. Email might already be in use.');
